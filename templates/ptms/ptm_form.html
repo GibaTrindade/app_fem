@@ -1,15 +1,17 @@
-﻿{% extends "base.html" %}
-{% block title %}Formulário PTM{% endblock %}
+{% extends "base.html" %}
+{% block title %}Formulario PTM{% endblock %}
 {% block content %}
-<div class="card">
-  <h1>{% if object %}Editar PTM{% else %}Novo PTM{% endif %}</h1>
-  <form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <div class="actions">
-      <button type="submit" class="btn">Salvar</button>
-      <a class="btn sec" href="{% if object %}{% url 'ptm_detail' object.pk %}{% else %}{% url 'ptm_list' %}{% endif %}">Cancelar</a>
-    </div>
-  </form>
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h1 class="h4 mb-3">{% if object %}Editar PTM{% else %}Novo PTM{% endif %}</h1>
+    <form method="post">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-primary">Salvar</button>
+        <a class="btn btn-outline-secondary" href="{% if object %}{% url 'ptm_detail' object.pk %}{% else %}{% url 'ptm_list' %}{% endif %}">Cancelar</a>
+      </div>
+    </form>
+  </div>
 </div>
 {% endblock %}

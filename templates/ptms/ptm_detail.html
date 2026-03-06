@@ -1,63 +1,801 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% block title %}PTM {{ ptm.ordem }}{% endblock %}
 {% block content %}
-<div class="card">
-  <h1>{{ ptm.ordem }} - {{ ptm.municipio }}</h1>
-  <p><strong>Projeto:</strong> {{ ptm.projeto }}</p>
-  <p><strong>Status PTM:</strong> {{ ptm.status_ptm_atual|default:"-" }} | <strong>Status Obra:</strong> {{ ptm.status_obra_atual|default:"-" }}</p>
-  <div class="actions">
-    <a class="btn sec" href="{% url 'ptm_list' %}">Voltar</a>
-    <a class="btn" href="{% url 'ptm_update' ptm.pk %}">Editar PTM</a>
-    <a class="btn danger" href="{% url 'ptm_delete' ptm.pk %}">Excluir PTM</a>
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-lg-7">
+        <h1 class="h4">{{ ptm.ordem }} - {{ ptm.municipio }}</h1>
+        <p class="mb-2"><strong>Projeto:</strong> {{ ptm.projeto }}</p>
+        <p class="mb-0">
+          <strong>Status PTM:</strong> {{ ptm.status_ptm_atual|default:"-" }} |
+          <strong>Status Obra:</strong> {{ ptm.status_obra_atual|default:"-" }}
+        </p>
+      </div>
+      <div class="col-lg-5">
+        <ul class="list-group list-group-flush">
+          <li class="list-group-item px-0"><strong>TETO FEM:</strong> {{ ptm.teto_fem|default:"-" }}</li>
+          <li class="list-group-item px-0"><strong>INVESTIMENTO TOTAL:</strong> {{ ptm.investimento_total|default:"-" }}</li>
+          <li class="list-group-item px-0"><strong>RECURSO FEM:</strong> {{ ptm.recurso_fem|default:"-" }}</li>
+          <li class="list-group-item px-0"><strong>CONTRAPARTIDA:</strong> {{ ptm.contrapartida|default:"-" }}</li>
+          <li class="list-group-item px-0"><strong>SECRETARIA:</strong> {{ ptm.secretaria|default:"-" }}</li>
+          <li class="list-group-item px-0"><strong>CONTA PTM:</strong> {{ ptm.conta_ptm|default:"-" }}</li>
+        </ul>
+      </div>
+    </div>
+    <div class="d-flex gap-2 mt-3">
+      <a class="btn btn-outline-secondary" href="{% url 'ptm_list' %}">Voltar</a>
+      {% if can_edit_ptm %}
+        <a class="btn btn-primary" href="{% url 'ptm_update' ptm.pk %}">Editar PTM</a>
+        <a class="btn btn-danger" href="{% url 'ptm_delete' ptm.pk %}">Excluir PTM</a>
+      {% endif %}
+    </div>
   </div>
 </div>
 
-<div class="card">
-  <div class="tabs">
-    <a class="{% if tab == 'eventos' %}active{% endif %}" href="?tab=eventos">Eventos</a>
-    <a class="{% if tab == 'pagamentos' %}active{% endif %}" href="?tab=pagamentos">Pagamentos</a>
-    <a class="{% if tab == 'vistorias' %}active{% endif %}" href="?tab=vistorias">Vistorias</a>
-    <a class="{% if tab == 'prestacao' %}active{% endif %}" href="?tab=prestacao">Prestação de Contas</a>
-    <a class="{% if tab == 'observacoes' %}active{% endif %}" href="?tab=observacoes">Obs/Enc</a>
-    <a class="{% if tab == 'conclusoes' %}active{% endif %}" href="?tab=conclusoes">Conclusão Informal</a>
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <ul class="nav nav-pills gap-2">
+      <li class="nav-item"><a class="nav-link {% if tab == 'eventos' %}active{% endif %}" href="?tab=eventos">Eventos</a></li>
+      <li class="nav-item"><a class="nav-link {% if tab == 'pagamentos' %}active{% endif %}" href="?tab=pagamentos">Pagamentos</a></li>
+      <li class="nav-item"><a class="nav-link {% if tab == 'vistorias' %}active{% endif %}" href="?tab=vistorias">Vistorias</a></li>
+      <li class="nav-item"><a class="nav-link {% if tab == 'prestacao' %}active{% endif %}" href="?tab=prestacao">Prestacao de Contas</a></li>
+      <li class="nav-item"><a class="nav-link {% if tab == 'observacoes' %}active{% endif %}" href="?tab=observacoes">Obs/Enc</a></li>
+      <li class="nav-item"><a class="nav-link {% if tab == 'conclusoes' %}active{% endif %}" href="?tab=conclusoes">Conclusao Informal</a></li>
+    </ul>
   </div>
 </div>
 
-<div class="card">
-{% if tab == 'eventos' %}
-  <div class="actions"><a class="btn" href="{% url 'evento_create' ptm.pk %}">Novo Evento</a></div>
-  <table><thead><tr><th>Data</th><th>Status PTM</th><th>Status Obra</th><th>Descrição</th></tr></thead><tbody>
-  {% for item in eventos %}<tr><td>{{ item.data_evento }}</td><td>{{ item.status_ptm }}</td><td>{{ item.status_obra }}</td><td>{{ item.descricao }}</td></tr>{% empty %}<tr><td colspan="4">Sem eventos.</td></tr>{% endfor %}
-  </tbody></table>
-{% elif tab == 'pagamentos' %}
-  <div class="actions"><a class="btn" href="{% url 'pagamento_create' ptm.pk %}">Novo Pagamento</a></div>
-  <table><thead><tr><th>Parcela</th><th>Tipo</th><th>Valor Previsto</th><th>Valor Realizado</th><th>Data Pg</th><th>OB</th></tr></thead><tbody>
-  {% for item in pagamentos %}<tr><td>{{ item.get_parcela_display }}</td><td>{{ item.get_tipo_registro_display }}</td><td>{{ item.valor_previsto }}</td><td>{{ item.valor_realizado }}</td><td>{{ item.dt_pagamento|default:"-" }}</td><td>{{ item.numero_ob|default:"-" }}</td></tr>{% empty %}<tr><td colspan="6">Sem pagamentos.</td></tr>{% endfor %}
-  </tbody></table>
-{% elif tab == 'vistorias' %}
-  <div class="actions"><a class="btn" href="{% url 'vistoria_create' ptm.pk %}">Nova Vistoria</a></div>
-  <table><thead><tr><th>Data Solicitação</th><th>Data Resposta</th><th>% Execução</th><th>Observação</th></tr></thead><tbody>
-  {% for item in vistorias %}<tr><td>{{ item.dt_solicitacao|default:"-" }}</td><td>{{ item.dt_resposta|default:"-" }}</td><td>{{ item.percentual_execucao }}</td><td>{{ item.observacao|default:"-" }}</td></tr>{% empty %}<tr><td colspan="4">Sem vistorias.</td></tr>{% endfor %}
-  </tbody></table>
-{% elif tab == 'prestacao' %}
-  <div class="actions">
-    <a class="btn" href="{% url 'prestacao_upsert' ptm.pk %}">Editar Prestação</a>
-    <a class="btn sec" href="{% url 'prestacao_historico_create' ptm.pk %}">Adicionar Observação</a>
+<div class="card shadow-sm">
+  <div class="card-body">
+    {% if tab == 'eventos' %}
+      {% if can_edit_ptm %}
+        <div class="mb-3"><a class="btn btn-primary" href="{% url 'evento_create' ptm.pk %}">Novo Evento</a></div>
+      {% endif %}
+      <div class="table-responsive">
+        <table class="table table-striped table-hover">
+          <thead class="table-light"><tr><th>Data</th><th>Status PTM</th><th>Status Obra</th><th>Descricao</th></tr></thead>
+          <tbody>
+          {% for item in eventos %}<tr><td>{{ item.data_evento }}</td><td>{{ item.status_ptm }}</td><td>{{ item.status_obra }}</td><td>{{ item.descricao }}</td></tr>{% empty %}<tr><td colspan="4">Sem eventos.</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% elif tab == 'pagamentos' %}
+      {% if can_edit_ptm %}
+        <div class="mb-3"><a class="btn btn-primary" href="{% url 'pagamento_create' ptm.pk %}">Novo Pagamento</a></div>
+      {% endif %}
+      <div class="table-responsive">
+        <table class="table table-striped table-hover">
+          <thead class="table-light"><tr><th>Parcela</th><th>Tipo</th><th>Valor Previsto</th><th>Valor Realizado</th><th>Data Pg</th><th>OB</th></tr></thead>
+          <tbody>
+          {% for item in pagamentos %}<tr><td>{{ item.get_parcela_display }}</td><td>{{ item.get_tipo_registro_display }}</td><td>{{ item.valor_previsto }}</td><td>{{ item.valor_realizado }}</td><td>{{ item.dt_pagamento|default:"-" }}</td><td>{{ item.numero_ob|default:"-" }}</td></tr>{% empty %}<tr><td colspan="6">Sem pagamentos.</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% elif tab == 'vistorias' %}
+      {% if can_edit_ptm %}
+        <div class="mb-3">
+          <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createVistoriaModal">
+            Nova Vistoria
+          </button>
+        </div>
+      {% endif %}
+      <div class="table-responsive">
+        <table class="table table-striped table-hover">
+          <thead class="table-light"><tr><th>Vistoria</th><th>Data Solicitacao</th><th>Data Resposta</th><th>% Execucao</th><th>Observacao</th><th class="text-end"></th></tr></thead>
+          <tbody>
+          {% for item in vistorias %}
+            <tr>
+              <td>{{ item.ordem_vistoria }}</td>
+              <td>{{ item.dt_solicitacao|default:"-" }}</td>
+              <td>{{ item.dt_resposta|default:"-" }}</td>
+              <td>{{ item.percentual_execucao_formatado }}</td>
+              <td>{{ item.observacao|default:"-" }}</td>
+              <td class="text-end">
+                <div class="d-inline-flex gap-1 flex-nowrap">
+                  {% if can_edit_ptm %}
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-primary"
+                      data-bs-toggle="modal"
+                      data-bs-target="#editVistoriaModal"
+                      data-action="{% url 'vistoria_update' ptm.pk item.pk %}"
+                      data-dt-solicitacao="{{ item.dt_solicitacao|date:'Y-m-d' }}"
+                      data-dt-resposta="{{ item.dt_resposta|date:'Y-m-d' }}"
+                      data-percentual="{{ item.percentual_execucao_formatado|cut:'%' }}"
+                      data-observacao="{{ item.observacao }}"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-danger"
+                      data-bs-toggle="modal"
+                      data-bs-target="#deleteVistoriaModal"
+                      data-action="{% url 'vistoria_delete' ptm.pk item.pk %}"
+                      data-label="Vistoria {{ item.ordem_vistoria }}"
+                    >
+                      Excluir
+                    </button>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6">Sem vistorias.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% elif tab == 'prestacao' %}
+      <div class="d-flex gap-2 mb-3 flex-wrap">
+        {% if can_edit_ptm %}
+          <button
+            type="button"
+            class="btn btn-primary"
+            data-bs-toggle="modal"
+            data-bs-target="#editPrestacaoModal"
+            data-prazo="{{ prestacao.prazo_contas|date:'Y-m-d' }}"
+            data-data-prestacao="{{ prestacao.data_prestacao|date:'Y-m-d' }}"
+            data-situacao="{{ prestacao.situacao|default:'' }}"
+          >
+            {{ prestacao|yesno:"Editar Prestacao,Adicionar Prestacao" }}
+          </button>
+          {% if prestacao %}
+            <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deletePrestacaoModal">
+              Excluir Prestacao
+            </button>
+          {% endif %}
+          <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#createHistoricoModal">
+            Adicionar Observacao
+          </button>
+        {% endif %}
+      </div>
+      <p><strong>Prazo:</strong> {{ prestacao.prazo_contas|default:"-" }} | <strong>Data Prestacao:</strong> {{ prestacao.data_prestacao|default:"-" }} | <strong>Situacao:</strong> {{ prestacao.situacao|default:"-" }}</p>
+      <div class="table-responsive">
+        <table class="table table-striped table-hover">
+          <thead class="table-light"><tr><th>Data</th><th>Observacao</th><th class="text-end"></th></tr></thead>
+          <tbody>
+          {% for item in prestacao_historico %}
+            <tr>
+              <td>{{ item.data|default:"-" }}</td>
+              <td>{{ item.observacao }}</td>
+              <td class="text-end">
+                <div class="d-inline-flex gap-1 flex-nowrap">
+                  {% if can_edit_ptm %}
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-primary"
+                      data-bs-toggle="modal"
+                      data-bs-target="#editHistoricoModal"
+                      data-action="{% url 'prestacao_historico_update' ptm.pk item.pk %}"
+                      data-data="{{ item.data|date:'Y-m-d' }}"
+                      data-observacao="{{ item.observacao }}"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-danger"
+                      data-bs-toggle="modal"
+                      data-bs-target="#deleteHistoricoModal"
+                      data-action="{% url 'prestacao_historico_delete' ptm.pk item.pk %}"
+                    >
+                      Excluir
+                    </button>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="3">Sem historico de prestacao.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% elif tab == 'observacoes' %}
+      {% if can_edit_ptm %}
+        <div class="mb-3">
+          <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createObservacaoModal">
+            Nova Observacao/Enc
+          </button>
+        </div>
+      {% endif %}
+      <div class="table-responsive">
+        <table class="table table-striped table-hover">
+          <thead class="table-light"><tr><th>Data</th><th>Origem</th><th>Observacao</th><th class="text-end"></th></tr></thead>
+          <tbody>
+          {% for item in observacoes %}
+            <tr>
+              <td>{{ item.data|default:"-" }}</td>
+              <td>{{ item.origem|default:"-" }}</td>
+              <td>{{ item.observacao }}</td>
+              <td class="text-end">
+                <div class="d-inline-flex gap-1 flex-nowrap">
+                  {% if can_edit_ptm %}
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-primary"
+                      data-bs-toggle="modal"
+                      data-bs-target="#editObservacaoModal"
+                      data-action="{% url 'observacao_update' ptm.pk item.pk %}"
+                      data-data="{{ item.data|date:'Y-m-d' }}"
+                      data-origem="{{ item.origem|default:'' }}"
+                      data-observacao="{{ item.observacao }}"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-danger"
+                      data-bs-toggle="modal"
+                      data-bs-target="#deleteObservacaoModal"
+                      data-action="{% url 'observacao_delete' ptm.pk item.pk %}"
+                    >
+                      Excluir
+                    </button>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4">Sem observacoes.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% elif tab == 'conclusoes' %}
+      {% if can_edit_ptm %}
+        <div class="mb-3">
+          <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createConclusaoModal">
+            Nova Conclusao Informal
+          </button>
+        </div>
+      {% endif %}
+      <div class="table-responsive">
+        <table class="table table-striped table-hover">
+          <thead class="table-light"><tr><th>% Declarado</th><th>Data</th><th>Contato</th><th>Observacao</th><th class="text-end"></th></tr></thead>
+          <tbody>
+          {% for item in conclusoes %}
+            <tr>
+              <td>{{ item.percentual_declarado_formatado }}</td>
+              <td>{{ item.data|default:"-" }}</td>
+              <td>{{ item.contato|default:"-" }}</td>
+              <td>{{ item.observacao|default:"-" }}</td>
+              <td class="text-end">
+                <div class="d-inline-flex gap-1 flex-nowrap">
+                  {% if can_edit_ptm %}
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-primary"
+                      data-bs-toggle="modal"
+                      data-bs-target="#editConclusaoModal"
+                      data-action="{% url 'conclusao_update' ptm.pk item.pk %}"
+                      data-percentual="{{ item.percentual_declarado_formatado|cut:'%' }}"
+                      data-data="{{ item.data|date:'Y-m-d' }}"
+                      data-contato="{{ item.contato|default:'' }}"
+                      data-observacao="{{ item.observacao|default:'' }}"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-danger"
+                      data-bs-toggle="modal"
+                      data-bs-target="#deleteConclusaoModal"
+                      data-action="{% url 'conclusao_delete' ptm.pk item.pk %}"
+                    >
+                      Excluir
+                    </button>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="5">Sem registros.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
   </div>
-  <p><strong>Prazo:</strong> {{ prestacao.prazo_contas|default:"-" }} | <strong>Data Prestação:</strong> {{ prestacao.data_prestacao|default:"-" }} | <strong>Situação:</strong> {{ prestacao.situacao|default:"-" }}</p>
-  <table><thead><tr><th>Data</th><th>Observação</th></tr></thead><tbody>
-  {% for item in prestacao_historico %}<tr><td>{{ item.data|default:"-" }}</td><td>{{ item.observacao }}</td></tr>{% empty %}<tr><td colspan="2">Sem histórico de prestação.</td></tr>{% endfor %}
-  </tbody></table>
-{% elif tab == 'observacoes' %}
-  <div class="actions"><a class="btn" href="{% url 'observacao_create' ptm.pk %}">Nova Observação/Enc</a></div>
-  <table><thead><tr><th>Data</th><th>Origem</th><th>Observação</th></tr></thead><tbody>
-  {% for item in observacoes %}<tr><td>{{ item.data|default:"-" }}</td><td>{{ item.origem|default:"-" }}</td><td>{{ item.observacao }}</td></tr>{% empty %}<tr><td colspan="3">Sem observações.</td></tr>{% endfor %}
-  </tbody></table>
-{% elif tab == 'conclusoes' %}
-  <div class="actions"><a class="btn" href="{% url 'conclusao_create' ptm.pk %}">Nova Conclusão Informal</a></div>
-  <table><thead><tr><th>% Declarado</th><th>Data</th><th>Contato</th><th>Observação</th></tr></thead><tbody>
-  {% for item in conclusoes %}<tr><td>{{ item.percentual_declarado }}</td><td>{{ item.data|default:"-" }}</td><td>{{ item.contato|default:"-" }}</td><td>{{ item.observacao|default:"-" }}</td></tr>{% empty %}<tr><td colspan="4">Sem registros.</td></tr>{% endfor %}
-  </tbody></table>
-{% endif %}
 </div>
+
+<div class="modal fade" id="editVistoriaModal" tabindex="-1" aria-labelledby="editVistoriaLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="editVistoriaForm" method="post">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="editVistoriaLabel">Editar Vistoria</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="id_modal_dt_solicitacao" class="form-label">Data Solicitacao</label>
+            <input type="date" class="form-control" name="dt_solicitacao" id="id_modal_dt_solicitacao">
+          </div>
+          <div class="mb-3">
+            <label for="id_modal_dt_resposta" class="form-label">Data Resposta</label>
+            <input type="date" class="form-control" name="dt_resposta" id="id_modal_dt_resposta">
+          </div>
+          <div class="mb-3">
+            <label for="id_modal_percentual_execucao" class="form-label">% Execucao</label>
+            <input type="number" step="0.01" min="0" class="form-control" name="percentual_execucao" id="id_modal_percentual_execucao">
+            <div class="form-text">Pode informar 30 para 30% ou 0.3.</div>
+          </div>
+          <div class="mb-0">
+            <label for="id_modal_observacao" class="form-label">Observacao</label>
+            <textarea class="form-control" rows="4" name="observacao" id="id_modal_observacao"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="deleteVistoriaModal" tabindex="-1" aria-labelledby="deleteVistoriaLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="deleteVistoriaForm" method="post">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="deleteVistoriaLabel">Excluir Vistoria</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-0">Confirma excluir <strong id="deleteVistoriaName">esta vistoria</strong>?</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-danger">Excluir</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="createVistoriaModal" tabindex="-1" aria-labelledby="createVistoriaLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'vistoria_create' ptm.pk %}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="createVistoriaLabel">Nova Vistoria</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="id_create_dt_solicitacao" class="form-label">Data Solicitacao</label>
+            <input type="date" class="form-control" name="dt_solicitacao" id="id_create_dt_solicitacao">
+          </div>
+          <div class="mb-3">
+            <label for="id_create_dt_resposta" class="form-label">Data Resposta</label>
+            <input type="date" class="form-control" name="dt_resposta" id="id_create_dt_resposta">
+          </div>
+          <div class="mb-3">
+            <label for="id_create_percentual_execucao" class="form-label">% Execucao</label>
+            <input type="number" step="0.01" min="0" class="form-control" name="percentual_execucao" id="id_create_percentual_execucao">
+            <div class="form-text">Pode informar 30 para 30% ou 0.3.</div>
+          </div>
+          <div class="mb-0">
+            <label for="id_create_observacao" class="form-label">Observacao</label>
+            <textarea class="form-control" rows="4" name="observacao" id="id_create_observacao"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="editPrestacaoModal" tabindex="-1" aria-labelledby="editPrestacaoLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'prestacao_upsert' ptm.pk %}" id="editPrestacaoForm">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="editPrestacaoLabel">Prestacao de Contas</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="id_prestacao_prazo" class="form-label">Prazo Contas</label>
+            <input type="date" class="form-control" name="prazo_contas" id="id_prestacao_prazo">
+          </div>
+          <div class="mb-3">
+            <label for="id_prestacao_data" class="form-label">Data Prestacao</label>
+            <input type="date" class="form-control" name="data_prestacao" id="id_prestacao_data">
+          </div>
+          <div class="mb-0">
+            <label for="id_prestacao_situacao" class="form-label">Situacao</label>
+            <input type="text" class="form-control" name="situacao" id="id_prestacao_situacao">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="deletePrestacaoModal" tabindex="-1" aria-labelledby="deletePrestacaoLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'prestacao_delete' ptm.pk %}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="deletePrestacaoLabel">Excluir Prestacao de Contas</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-0">Confirma excluir a prestacao e todo o historico?</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-danger">Excluir</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="createHistoricoModal" tabindex="-1" aria-labelledby="createHistoricoLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'prestacao_historico_create' ptm.pk %}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="createHistoricoLabel">Adicionar Observacao da Prestacao</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="id_create_hist_data" class="form-label">Data</label>
+            <input type="date" class="form-control" name="data" id="id_create_hist_data">
+          </div>
+          <div class="mb-0">
+            <label for="id_create_hist_obs" class="form-label">Observacao</label>
+            <textarea class="form-control" rows="4" name="observacao" id="id_create_hist_obs"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="editHistoricoModal" tabindex="-1" aria-labelledby="editHistoricoLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" id="editHistoricoForm">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="editHistoricoLabel">Editar Observacao da Prestacao</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="id_edit_hist_data" class="form-label">Data</label>
+            <input type="date" class="form-control" name="data" id="id_edit_hist_data">
+          </div>
+          <div class="mb-0">
+            <label for="id_edit_hist_obs" class="form-label">Observacao</label>
+            <textarea class="form-control" rows="4" name="observacao" id="id_edit_hist_obs"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="deleteHistoricoModal" tabindex="-1" aria-labelledby="deleteHistoricoLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" id="deleteHistoricoForm">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="deleteHistoricoLabel">Excluir Observacao da Prestacao</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-0">Confirma excluir esta observacao?</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-danger">Excluir</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="createObservacaoModal" tabindex="-1" aria-labelledby="createObservacaoLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'observacao_create' ptm.pk %}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="createObservacaoLabel">Nova Observacao/Encaminhamento</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="id_create_obs_data" class="form-label">Data</label>
+            <input type="date" class="form-control" name="data" id="id_create_obs_data">
+          </div>
+          <div class="mb-3">
+            <label for="id_create_obs_origem" class="form-label">Origem</label>
+            <input type="text" class="form-control" name="origem" id="id_create_obs_origem">
+          </div>
+          <div class="mb-0">
+            <label for="id_create_obs_observacao" class="form-label">Observacao</label>
+            <textarea class="form-control" rows="4" name="observacao" id="id_create_obs_observacao"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="editObservacaoModal" tabindex="-1" aria-labelledby="editObservacaoLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" id="editObservacaoForm">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="editObservacaoLabel">Editar Observacao/Encaminhamento</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="id_edit_obs_data" class="form-label">Data</label>
+            <input type="date" class="form-control" name="data" id="id_edit_obs_data">
+          </div>
+          <div class="mb-3">
+            <label for="id_edit_obs_origem" class="form-label">Origem</label>
+            <input type="text" class="form-control" name="origem" id="id_edit_obs_origem">
+          </div>
+          <div class="mb-0">
+            <label for="id_edit_obs_observacao" class="form-label">Observacao</label>
+            <textarea class="form-control" rows="4" name="observacao" id="id_edit_obs_observacao"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="deleteObservacaoModal" tabindex="-1" aria-labelledby="deleteObservacaoLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" id="deleteObservacaoForm">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="deleteObservacaoLabel">Excluir Observacao/Encaminhamento</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-0">Confirma excluir esta observacao/encaminhamento?</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-danger">Excluir</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="createConclusaoModal" tabindex="-1" aria-labelledby="createConclusaoLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'conclusao_create' ptm.pk %}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="createConclusaoLabel">Nova Conclusao Informal</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="id_create_conc_percentual" class="form-label">% Declarado</label>
+            <input type="number" step="0.01" min="0" class="form-control" name="percentual_declarado" id="id_create_conc_percentual">
+            <div class="form-text">Pode informar 30 para 30% ou 0.3.</div>
+          </div>
+          <div class="mb-3">
+            <label for="id_create_conc_data" class="form-label">Data</label>
+            <input type="date" class="form-control" name="data" id="id_create_conc_data">
+          </div>
+          <div class="mb-3">
+            <label for="id_create_conc_contato" class="form-label">Contato</label>
+            <input type="text" class="form-control" name="contato" id="id_create_conc_contato">
+          </div>
+          <div class="mb-0">
+            <label for="id_create_conc_observacao" class="form-label">Observacao</label>
+            <textarea class="form-control" rows="4" name="observacao" id="id_create_conc_observacao"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="editConclusaoModal" tabindex="-1" aria-labelledby="editConclusaoLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" id="editConclusaoForm">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="editConclusaoLabel">Editar Conclusao Informal</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="id_edit_conc_percentual" class="form-label">% Declarado</label>
+            <input type="number" step="0.01" min="0" class="form-control" name="percentual_declarado" id="id_edit_conc_percentual">
+            <div class="form-text">Pode informar 30 para 30% ou 0.3.</div>
+          </div>
+          <div class="mb-3">
+            <label for="id_edit_conc_data" class="form-label">Data</label>
+            <input type="date" class="form-control" name="data" id="id_edit_conc_data">
+          </div>
+          <div class="mb-3">
+            <label for="id_edit_conc_contato" class="form-label">Contato</label>
+            <input type="text" class="form-control" name="contato" id="id_edit_conc_contato">
+          </div>
+          <div class="mb-0">
+            <label for="id_edit_conc_observacao" class="form-label">Observacao</label>
+            <textarea class="form-control" rows="4" name="observacao" id="id_edit_conc_observacao"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="deleteConclusaoModal" tabindex="-1" aria-labelledby="deleteConclusaoLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" id="deleteConclusaoForm">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="deleteConclusaoLabel">Excluir Conclusao Informal</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-0">Confirma excluir esta conclusao informal?</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-danger">Excluir</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  const editVistoriaModal = document.getElementById("editVistoriaModal");
+  if (editVistoriaModal) {
+    editVistoriaModal.addEventListener("show.bs.modal", function (event) {
+      const button = event.relatedTarget;
+      const form = document.getElementById("editVistoriaForm");
+      form.action = button.getAttribute("data-action");
+      document.getElementById("id_modal_dt_solicitacao").value = button.getAttribute("data-dt-solicitacao") || "";
+      document.getElementById("id_modal_dt_resposta").value = button.getAttribute("data-dt-resposta") || "";
+      document.getElementById("id_modal_percentual_execucao").value = button.getAttribute("data-percentual") || "";
+      document.getElementById("id_modal_observacao").value = button.getAttribute("data-observacao") || "";
+    });
+  }
+
+  const deleteVistoriaModal = document.getElementById("deleteVistoriaModal");
+  if (deleteVistoriaModal) {
+    deleteVistoriaModal.addEventListener("show.bs.modal", function (event) {
+      const button = event.relatedTarget;
+      document.getElementById("deleteVistoriaForm").action = button.getAttribute("data-action");
+      document.getElementById("deleteVistoriaName").textContent = button.getAttribute("data-label") || "esta vistoria";
+    });
+  }
+
+  const editPrestacaoModal = document.getElementById("editPrestacaoModal");
+  if (editPrestacaoModal) {
+    editPrestacaoModal.addEventListener("show.bs.modal", function (event) {
+      const button = event.relatedTarget;
+      document.getElementById("id_prestacao_prazo").value = button.getAttribute("data-prazo") || "";
+      document.getElementById("id_prestacao_data").value = button.getAttribute("data-data-prestacao") || "";
+      document.getElementById("id_prestacao_situacao").value = button.getAttribute("data-situacao") || "";
+    });
+  }
+
+  const editHistoricoModal = document.getElementById("editHistoricoModal");
+  if (editHistoricoModal) {
+    editHistoricoModal.addEventListener("show.bs.modal", function (event) {
+      const button = event.relatedTarget;
+      document.getElementById("editHistoricoForm").action = button.getAttribute("data-action");
+      document.getElementById("id_edit_hist_data").value = button.getAttribute("data-data") || "";
+      document.getElementById("id_edit_hist_obs").value = button.getAttribute("data-observacao") || "";
+    });
+  }
+
+  const deleteHistoricoModal = document.getElementById("deleteHistoricoModal");
+  if (deleteHistoricoModal) {
+    deleteHistoricoModal.addEventListener("show.bs.modal", function (event) {
+      const button = event.relatedTarget;
+      document.getElementById("deleteHistoricoForm").action = button.getAttribute("data-action");
+    });
+  }
+
+  const editObservacaoModal = document.getElementById("editObservacaoModal");
+  if (editObservacaoModal) {
+    editObservacaoModal.addEventListener("show.bs.modal", function (event) {
+      const button = event.relatedTarget;
+      document.getElementById("editObservacaoForm").action = button.getAttribute("data-action");
+      document.getElementById("id_edit_obs_data").value = button.getAttribute("data-data") || "";
+      document.getElementById("id_edit_obs_origem").value = button.getAttribute("data-origem") || "";
+      document.getElementById("id_edit_obs_observacao").value = button.getAttribute("data-observacao") || "";
+    });
+  }
+
+  const deleteObservacaoModal = document.getElementById("deleteObservacaoModal");
+  if (deleteObservacaoModal) {
+    deleteObservacaoModal.addEventListener("show.bs.modal", function (event) {
+      const button = event.relatedTarget;
+      document.getElementById("deleteObservacaoForm").action = button.getAttribute("data-action");
+    });
+  }
+
+  const editConclusaoModal = document.getElementById("editConclusaoModal");
+  if (editConclusaoModal) {
+    editConclusaoModal.addEventListener("show.bs.modal", function (event) {
+      const button = event.relatedTarget;
+      document.getElementById("editConclusaoForm").action = button.getAttribute("data-action");
+      document.getElementById("id_edit_conc_percentual").value = button.getAttribute("data-percentual") || "";
+      document.getElementById("id_edit_conc_data").value = button.getAttribute("data-data") || "";
+      document.getElementById("id_edit_conc_contato").value = button.getAttribute("data-contato") || "";
+      document.getElementById("id_edit_conc_observacao").value = button.getAttribute("data-observacao") || "";
+    });
+  }
+
+  const deleteConclusaoModal = document.getElementById("deleteConclusaoModal");
+  if (deleteConclusaoModal) {
+    deleteConclusaoModal.addEventListener("show.bs.modal", function (event) {
+      const button = event.relatedTarget;
+      document.getElementById("deleteConclusaoForm").action = button.getAttribute("data-action");
+    });
+  }
+</script>
 {% endblock %}

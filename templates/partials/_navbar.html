@@ -1,0 +1,17 @@
+<nav class="navbar navbar-expand-lg navbar-dark" style="background-color:#0c3c60;">
+  <div class="container-fluid app-main">
+    <a class="navbar-brand fw-semibold" href="{% url 'ptm_list' %}">FEM - Controle PTM</a>
+    <div class="d-flex align-items-center gap-2">
+      {% if user.is_authenticated %}
+        <span class="text-white-50 small">{{ user.username }}</span>
+        <a class="btn btn-sm btn-outline-light" href="{% url 'core:profile' %}">Meu Perfil</a>
+        <form method="post" action="{% url 'core:logout' %}" class="m-0">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-sm btn-light">Sair</button>
+        </form>
+      {% else %}
+        <a class="btn btn-sm btn-light" href="{% url 'core:login' %}">Entrar</a>
+      {% endif %}
+    </div>
+  </div>
+</nav>

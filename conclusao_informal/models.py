@@ -18,3 +18,10 @@ class ConclusaoInformalPTM(TimestampedModel):
 
     def __str__(self):
         return f"{self.ptm.ordem} - {self.percentual_declarado}"
+
+    @property
+    def percentual_declarado_formatado(self) -> str:
+        valor = (self.percentual_declarado or Decimal("0.0000")) * Decimal("100")
+        valor = valor.quantize(Decimal("0.01"))
+        texto = format(valor, "f").rstrip("0").rstrip(".")
+        return f"{texto}%"

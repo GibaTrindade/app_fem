@@ -9,10 +9,11 @@ import unicodedata
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from openpyxl import load_workbook
+from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
 from conclusao_informal.models import ConclusaoInformalPTM
-from core.models import AreaInvestimento, Secretaria, StatusObra, StatusPTM, TipoFEM
+from core.models import AreaInvestimento, Municipio, Secretaria, StatusObra, StatusPTM, TipoFEM
 from eventos.models import EventoPTM
 from observacoes.models import ObservacaoEncaminhamentoPTM
 from pagamentos.models import PagamentoPTM
@@ -76,8 +77,8 @@ def _to_percentage(value) -> Decimal:
 
 
 def _iter_ptm_rows(ws: Worksheet):
-    for row in range(7, ws.max_row + 1):
-        ordem = _to_str(ws[f"B{row}"].value)
+    for row in range(2, ws.max_row + 1):
+        ordem = _to_str(ws[f"A{row}"].value)
         if ordem:
             yield row, ordem
 
@@ -87,6 +88,13 @@ def _get_or_create_nome(model, value: str):
     if not value:
         return None
     obj, _ = model.objects.get_or_create(nome=value)
+    return obj
+
+
+def _required_nome(model, value: str, default: str):
+    obj = _get_or_create_nome(model, value)
+    if obj is None:
+        obj, _ = model.objects.get_or_create(nome=default)
     return obj
 
 
@@ -108,7 +116,19 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--file", required=True, help="Caminho da planilha .xlsm")
-        parser.add_argument("--limit", type=int, default=0, help="Limita quantidade de PTMs importados (teste)")
+        parser.add_argument(
+            "--limit", type=int, default=0, help="Limita quantidade de PTMs importados (teste)"
+        )
+        parser.add_argument(
+            "--skip-related",
+            action="store_true",
+            help="Importa apenas APOIO + INF GERAIS (sem abas filhas).",
+        )
+        parser.add_argument(
+            "--only-events",
+            action="store_true",
+            help="Importa apenas EVENTOS para PTMs ja existentes.",
+        )
 
     def handle(self, *args, **options):
         file_path = Path(options["file"])
@@ -116,15 +136,19 @@ class Command(BaseCommand):
             raise CommandError(f"Arquivo nao encontrado: {file_path}")
 
         limit = max(0, int(options["limit"] or 0))
+        skip_related = options["skip_related"]
+        only_events = options["only_events"]
+
         wb = load_workbook(file_path, data_only=True, keep_vba=True)
         ws_apoio = _sheet_by_name(wb, "APOIO")
         ws_inf = _sheet_by_name(wb, "INF GERAIS")
         ws_eventos = _sheet_by_name(wb, "EVENTOS")
-        ws_pagamentos = _sheet_by_name(wb, "PAGAMENTOS")
-        ws_vistorias = _sheet_by_name(wb, "VISTORIA")
-        ws_prestacao = _sheet_by_name(wb, "PRESTAÇÃO DE CONTAS")
-        ws_obs = _sheet_by_name(wb, "OBS  ENC")
-        ws_conclusao = _sheet_by_name(wb, "CONCLUSÃO INFORMAL")
+        if not skip_related and not only_events:
+            ws_pagamentos = _sheet_by_name(wb, "PAGAMENTOS")
+            ws_vistorias = _sheet_by_name(wb, "VISTORIA")
+            ws_prestacao = _sheet_by_name(wb, "PRESTACAO DE CONTAS")
+            ws_obs = _sheet_by_name(wb, "OBS  ENC")
+            ws_conclusao = _sheet_by_name(wb, "CONCLUSAO INFORMAL")
 
         counters = Counters()
         self._seed_catalogs(ws_apoio)
@@ -134,27 +158,35 @@ class Command(BaseCommand):
             if limit and processed >= limit:
                 break
             with transaction.atomic():
-                ptm, created = self._upsert_ptm(ws_inf, row, ordem)
-                if created:
-                    counters.ptms_created += 1
+                if only_events:
+                    ptm = PTM.objects.filter(ordem=ordem).first()
+                    if ptm is None:
+                        ptm, _ = self._upsert_ptm(ws_inf, row, ordem)
+                    ptm.eventos.all().delete()
+                    counters.eventos += self._import_eventos(ws_eventos, row, ptm)
                 else:
-                    counters.ptms_updated += 1
+                    ptm, created = self._upsert_ptm(ws_inf, row, ordem)
+                    if created:
+                        counters.ptms_created += 1
+                    else:
+                        counters.ptms_updated += 1
 
-                ptm.eventos.all().delete()
-                ptm.pagamentos.all().delete()
-                ptm.vistorias.all().delete()
-                ptm.observacoes_enc.all().delete()
-                ptm.conclusoes_informais.all().delete()
-                PrestacaoContaPTM.objects.filter(ptm=ptm).delete()
+                    if not skip_related:
+                        ptm.eventos.all().delete()
+                        ptm.pagamentos.all().delete()
+                        ptm.vistorias.all().delete()
+                        ptm.observacoes_enc.all().delete()
+                        ptm.conclusoes_informais.all().delete()
+                        PrestacaoContaPTM.objects.filter(ptm=ptm).delete()
 
-                counters.eventos += self._import_eventos(ws_eventos, row, ptm)
-                counters.pagamentos += self._import_pagamentos(ws_pagamentos, row, ptm)
-                counters.vistorias += self._import_vistorias(ws_vistorias, row, ptm)
-                p_count, ph_count = self._import_prestacao(ws_prestacao, row, ptm)
-                counters.prestacoes += p_count
-                counters.prestacao_historico += ph_count
-                counters.observacoes += self._import_observacoes(ws_obs, row, ptm)
-                counters.conclusoes += self._import_conclusoes(ws_conclusao, row, ptm)
+                        counters.eventos += self._import_eventos(ws_eventos, row, ptm)
+                        counters.pagamentos += self._import_pagamentos(ws_pagamentos, row, ptm)
+                        counters.vistorias += self._import_vistorias(ws_vistorias, row, ptm)
+                        p_count, ph_count = self._import_prestacao(ws_prestacao, row, ptm)
+                        counters.prestacoes += p_count
+                        counters.prestacao_historico += ph_count
+                        counters.observacoes += self._import_observacoes(ws_obs, row, ptm)
+                        counters.conclusoes += self._import_conclusoes(ws_conclusao, row, ptm)
             processed += 1
             if processed % 25 == 0:
                 self.stdout.write(f"Processados {processed} PTMs...")
@@ -163,54 +195,58 @@ class Command(BaseCommand):
         self.stdout.write(
             f"PTMs criados: {counters.ptms_created} | atualizados: {counters.ptms_updated}"
         )
-        self.stdout.write(
-            "Registros: "
-            f"eventos={counters.eventos}, pagamentos={counters.pagamentos}, "
-            f"vistorias={counters.vistorias}, prestacoes={counters.prestacoes}, "
-            f"prestacao_historico={counters.prestacao_historico}, "
-            f"obs_enc={counters.observacoes}, conclusoes={counters.conclusoes}"
-        )
+        if only_events:
+            self.stdout.write(f"Eventos importados: {counters.eventos}")
+        elif skip_related:
+            self.stdout.write("Importacao de dados relacionados ignorada via --skip-related.")
+        else:
+            self.stdout.write(
+                "Registros: "
+                f"eventos={counters.eventos}, pagamentos={counters.pagamentos}, "
+                f"vistorias={counters.vistorias}, prestacoes={counters.prestacoes}, "
+                f"prestacao_historico={counters.prestacao_historico}, "
+                f"obs_enc={counters.observacoes}, conclusoes={counters.conclusoes}"
+            )
 
     def _seed_catalogs(self, ws_apoio: Worksheet):
         for value in ("NORMAL", "MULHER", "EMENDA"):
             TipoFEM.objects.get_or_create(nome=value)
 
-        for row in range(5, 51):
+        for row in range(3, ws_apoio.max_row + 1):
             _get_or_create_nome(StatusPTM, ws_apoio[f"B{row}"].value)
             _get_or_create_nome(StatusObra, ws_apoio[f"C{row}"].value)
-
-        for row in range(5, 2001):
-            _get_or_create_nome(AreaInvestimento, ws_apoio[f"AJ{row}"].value)
-            _get_or_create_nome(Secretaria, ws_apoio[f"AL{row}"].value)
+            _get_or_create_nome(Municipio, ws_apoio[f"I{row}"].value)
 
     def _upsert_ptm(self, ws_inf: Worksheet, row: int, ordem: str):
-        tipo_fem = _get_or_create_nome(TipoFEM, ws_inf[f"G{row}"].value)
-        status_ptm = _get_or_create_nome(StatusPTM, ws_inf[f"N{row}"].value)
-        status_obra = _get_or_create_nome(StatusObra, ws_inf[f"O{row}"].value)
-        area = _get_or_create_nome(AreaInvestimento, ws_inf[f"T{row}"].value)
-        secretaria = _get_or_create_nome(Secretaria, ws_inf[f"R{row}"].value)
+        tipo_fem = _required_nome(TipoFEM, ws_inf[f"F{row}"].value, "NORMAL")
+        status_ptm = _get_or_create_nome(StatusPTM, ws_inf[f"M{row}"].value)
+        status_obra = _get_or_create_nome(StatusObra, ws_inf[f"N{row}"].value)
+        area = _get_or_create_nome(AreaInvestimento, ws_inf[f"S{row}"].value)
+        secretaria = _get_or_create_nome(Secretaria, ws_inf[f"Q{row}"].value)
 
         defaults = {
-            "regiao": _to_str(ws_inf[f"C{row}"].value),
-            "municipio": _to_str(ws_inf[f"D{row}"].value),
-            "projeto": _to_str(ws_inf[f"E{row}"].value),
-            "projeto_detalhado": _to_str(ws_inf[f"F{row}"].value),
+            "regiao": _to_str(ws_inf[f"B{row}"].value),
+            "municipio": _to_str(ws_inf[f"C{row}"].value),
+            "projeto": _to_str(ws_inf[f"D{row}"].value),
+            "projeto_detalhado": _to_str(ws_inf[f"E{row}"].value),
             "tipo_fem": tipo_fem,
             "status_ptm_atual": status_ptm,
             "status_obra_atual": status_obra,
-            "data_final": _to_date(ws_inf[f"H{row}"].value),
-            "data_aprovacao": _to_date(ws_inf[f"P{row}"].value),
-            "teto_fem": _to_decimal(ws_inf[f"I{row}"].value),
-            "investimento_total": _to_decimal(ws_inf[f"J{row}"].value),
-            "recurso_fem": _to_decimal(ws_inf[f"K{row}"].value),
-            "rendimentos_fem": _to_decimal(ws_inf[f"L{row}"].value),
-            "contrapartida": _to_decimal(ws_inf[f"M{row}"].value),
-            "ressalva": _to_str(ws_inf[f"Q{row}"].value),
+            "data_final": _to_date(ws_inf[f"G{row}"].value),
+            "data_aprovacao": _to_date(ws_inf[f"O{row}"].value),
+            "teto_fem": _to_decimal(ws_inf[f"H{row}"].value),
+            "investimento_total": _to_decimal(ws_inf[f"I{row}"].value),
+            "recurso_fem": _to_decimal(ws_inf[f"J{row}"].value),
+            "rendimentos_fem": _to_decimal(ws_inf[f"K{row}"].value),
+            "contrapartida": _to_decimal(ws_inf[f"L{row}"].value),
+            "ressalva": _to_str(ws_inf[f"P{row}"].value),
             "secretaria": secretaria,
             "area_investimento": area,
-            "conta_ptm": _to_str(ws_inf[f"U{row}"].value),
-            "descricao": _to_str(ws_inf[f"AJ{row}"].value),
-            "populacao_beneficiada": ws_inf[f"V{row}"].value if isinstance(ws_inf[f"V{row}"].value, int) else None,
+            "conta_ptm": _to_str(ws_inf[f"T{row}"].value),
+            "descricao": _to_str(ws_inf[f"AI{row}"].value),
+            "populacao_beneficiada": int(ws_inf[f"U{row}"].value)
+            if isinstance(ws_inf[f"U{row}"].value, (int, float))
+            else None,
         }
 
         return PTM.objects.update_or_create(ordem=ordem, defaults=defaults)
@@ -220,7 +256,7 @@ class Command(BaseCommand):
         latest_status_ptm = None
         latest_status_obra = None
         latest_data = date.min
-        col = 7  # G
+        col = 6  # F
         while col + 3 <= ws.max_column:
             descricao = _to_str(ws.cell(row=row, column=col).value)
             data_evento = _to_date(ws.cell(row=row, column=col + 1).value)
@@ -305,31 +341,47 @@ class Command(BaseCommand):
 
     def _import_vistorias(self, ws: Worksheet, row: int, ptm: PTM) -> int:
         created = 0
-        blocks = [
-            ("G", "H", "I", "J"),
-            ("K", "L", "M", "N"),
-            ("O", "P", "Q", "R"),
-            ("S", "T", "U", "V"),
-            ("W", "X", "Y", "Z"),
-        ]
-        for c_sol, c_resp, c_pct, c_obs in blocks:
+        col = 6  # F
+        idx = 1
+        while col + 3 <= ws.max_column:
+            c_sol = get_column_letter(col)
+            c_resp = get_column_letter(col + 1)
+            c_pct = get_column_letter(col + 2)
+            c_obs = get_column_letter(col + 3)
             if ws[f"{c_sol}{row}"].value in (None, "") and ws[f"{c_resp}{row}"].value in (None, ""):
+                col += 4
+                idx += 1
                 continue
             VistoriaPTM.objects.create(
                 ptm=ptm,
+                ordem_vistoria=idx,
                 dt_solicitacao=_to_date(ws[f"{c_sol}{row}"].value),
                 dt_resposta=_to_date(ws[f"{c_resp}{row}"].value),
                 percentual_execucao=_to_percentage(ws[f"{c_pct}{row}"].value),
                 observacao=_to_str(ws[f"{c_obs}{row}"].value),
             )
             created += 1
+            col += 4
+            idx += 1
         return created
 
     def _import_prestacao(self, ws: Worksheet, row: int, ptm: PTM) -> tuple[int, int]:
         base_has_data = any(
             ws[f"{col}{row}"].value not in (None, "") for col in ("G", "H", "I")
         )
-        hist_pairs = [("J", "K"), ("L", "M"), ("N", "O"), ("P", "Q"), ("R", "S"), ("T", "U"), ("V", "W"), ("X", "Y"), ("Z", "AA"), ("AB", "AC"), ("AD", "AE")]
+        hist_pairs = [
+            ("J", "K"),
+            ("L", "M"),
+            ("N", "O"),
+            ("P", "Q"),
+            ("R", "S"),
+            ("T", "U"),
+            ("V", "W"),
+            ("X", "Y"),
+            ("Z", "AA"),
+            ("AB", "AC"),
+            ("AD", "AE"),
+        ]
         hist_count = 0
 
         if not base_has_data and not any(

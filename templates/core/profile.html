@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Meu Perfil | FEM{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12 col-lg-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h1 class="h4 mb-3">Meu Perfil</h1>
+        <dl class="row mb-4">
+          <dt class="col-sm-4">Usuário</dt>
+          <dd class="col-sm-8">{{ request.user.username }}</dd>
+          <dt class="col-sm-4">Nome</dt>
+          <dd class="col-sm-8">{{ request.user.get_full_name|default:"-" }}</dd>
+          <dt class="col-sm-4">E-mail</dt>
+          <dd class="col-sm-8">{{ request.user.email|default:"-" }}</dd>
+        </dl>
+        <a href="{% url 'core:change_password' %}" class="btn btn-primary">Alterar senha</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

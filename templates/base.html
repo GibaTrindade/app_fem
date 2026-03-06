@@ -1,43 +1,19 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}FEM{% endblock %}</title>
-  <style>
-    body { font-family: Segoe UI, Arial, sans-serif; margin: 0; background: #f5f7fb; color: #1a1a1a; }
-    header { background: #0c3c60; color: #fff; padding: 12px 20px; }
-    header a { color: #fff; text-decoration: none; font-weight: 600; }
-    .container { max-width: 1200px; margin: 24px auto; padding: 0 16px; }
-    .card { background: #fff; border: 1px solid #dbe3ee; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
-    .actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
-    .btn { display: inline-block; padding: 8px 12px; border-radius: 6px; border: 1px solid #0c3c60; background: #0c3c60; color: #fff; text-decoration: none; }
-    .btn.sec { background: #fff; color: #0c3c60; }
-    .btn.danger { background: #b42318; border-color: #b42318; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { border-bottom: 1px solid #e5e7eb; padding: 8px; text-align: left; font-size: 14px; }
-    .tabs { display: flex; gap: 8px; flex-wrap: wrap; }
-    .tabs a { padding: 8px 10px; border: 1px solid #dbe3ee; border-radius: 6px; text-decoration: none; color: #0c3c60; background: #fff; }
-    .tabs a.active { background: #0c3c60; color: #fff; border-color: #0c3c60; }
-    form p { margin: 0 0 12px; display: flex; flex-direction: column; gap: 4px; }
-    input, select, textarea { border: 1px solid #c8d1dc; border-radius: 6px; padding: 8px; font: inherit; }
-    .messages { list-style: none; padding: 0; }
-    .messages li { background: #ecfdf3; border: 1px solid #abefc6; padding: 10px; border-radius: 6px; margin-bottom: 10px; }
-  </style>
+  {% include "partials/_styles.html" %}
+  {% block extra_head %}{% endblock %}
 </head>
 <body>
-  <header>
-    <a href="{% url 'ptm_list' %}">FEM - Controle PTM</a>
-  </header>
-  <main class="container">
-    {% if messages %}
-      <ul class="messages">
-        {% for message in messages %}
-          <li>{{ message }}</li>
-        {% endfor %}
-      </ul>
-    {% endif %}
+  {% include "partials/_navbar.html" %}
+  <main class="container app-main py-4">
+    {% include "partials/_messages.html" %}
     {% block content %}{% endblock %}
   </main>
+  {% include "partials/_scripts.html" %}
+  {% block extra_scripts %}{% endblock %}
 </body>
 </html>

@@ -1,15 +1,17 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% block title %}Excluir PTM{% endblock %}
 {% block content %}
-<div class="card">
-  <h1>Excluir PTM</h1>
-  <p>Confirma excluir <strong>{{ object }}</strong>?</p>
-  <form method="post">
-    {% csrf_token %}
-    <div class="actions">
-      <button type="submit" class="btn danger">Excluir</button>
-      <a class="btn sec" href="{% url 'ptm_detail' object.pk %}">Cancelar</a>
-    </div>
-  </form>
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h1 class="h4 mb-3">Excluir PTM</h1>
+    <p>Confirma excluir <strong>{{ object }}</strong>?</p>
+    <form method="post">
+      {% csrf_token %}
+      <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-danger">Excluir</button>
+        <a class="btn btn-outline-secondary" href="{% url 'ptm_detail' object.pk %}">Cancelar</a>
+      </div>
+    </form>
+  </div>
 </div>
 {% endblock %}
