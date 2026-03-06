@@ -1,33 +1,153 @@
 {% extends "base.html" %}
+{% load number_formats %}
 {% block title %}PTM {{ ptm.ordem }}{% endblock %}
 {% block content %}
 <div class="card shadow-sm mb-3">
-  <div class="card-body">
-    <div class="row g-3">
-      <div class="col-lg-7">
-        <h1 class="h4">{{ ptm.ordem }} - {{ ptm.municipio }}</h1>
-        <p class="mb-2"><strong>Projeto:</strong> {{ ptm.projeto }}</p>
-        <p class="mb-2"><strong>Status PTM:</strong> {{ ptm.status_ptm_atual|default:"-" }}</p> 
-        <p class="mb-2"><strong>Status Obra:</strong> {{ ptm.status_obra_atual|default:"-" }}</p>
-        
-      </div>
-      <div class="col-lg-5">
-        <ul class="list-group list-group-flush">
-          <li class="list-group-item px-0"><strong>TETO FEM:</strong> {{ ptm.teto_fem|floatformat:"2g" }}</li>
-          <li class="list-group-item px-0"><strong>INVESTIMENTO TOTAL:</strong> {{ ptm.investimento_total|floatformat:"2g" }}</li>
-          <li class="list-group-item px-0"><strong>RECURSO FEM:</strong> {{ ptm.recurso_fem|floatformat:"2g" }}</li>
-          <li class="list-group-item px-0"><strong>CONTRAPARTIDA:</strong> {{ ptm.contrapartida|floatformat:"2g" }}</li>
-          <li class="list-group-item px-0"><strong>SECRETARIA:</strong> {{ ptm.secretaria|default:"-" }}</li>
-          <li class="list-group-item px-0"><strong>CONTA PTM:</strong> {{ ptm.conta_ptm|default:"-" }}</li>
-        </ul>
+  <div class="card-body p-0">
+    <div class="p-4 border-bottom bg-light-subtle">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+          <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+            <span class="badge text-bg-light border">PTM {{ ptm.ordem }}</span>
+            <span class="badge text-bg-secondary">{{ ptm.municipio }}</span>
+            {% if ptm.regiao %}
+              <span class="badge text-bg-light border">{{ ptm.regiao }}</span>
+            {% endif %}
+          </div>
+          <h1 class="h4 mb-1">{{ ptm.projeto }}</h1>
+          <p class="text-muted mb-0">
+            {% if ptm.secretaria %}{{ ptm.secretaria }}{% else %}Secretaria nao informada{% endif %}
+            {% if ptm.area_investimento %} • {{ ptm.area_investimento }}{% endif %}
+            {% if ptm.tipo_fem %} • {{ ptm.tipo_fem }}{% endif %}
+          </p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap justify-content-end">
+          <button
+            class="btn btn-outline-secondary"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#ptmResumoCollapse"
+            aria-expanded="false"
+            aria-controls="ptmResumoCollapse"
+          >
+            Mostrar Resumo
+          </button>
+          <a class="btn btn-outline-secondary" href="{% url 'ptm_list' %}">Voltar</a>
+          {% if can_edit_ptm %}
+            <a class="btn btn-primary" href="{% url 'ptm_update' ptm.pk %}">Editar PTM</a>
+            <a class="btn btn-danger" href="{% url 'ptm_delete' ptm.pk %}">Excluir PTM</a>
+          {% endif %}
+        </div>
       </div>
     </div>
-    <div class="d-flex gap-2 mt-3">
-      <a class="btn btn-outline-secondary" href="{% url 'ptm_list' %}">Voltar</a>
-      {% if can_edit_ptm %}
-        <a class="btn btn-primary" href="{% url 'ptm_update' ptm.pk %}">Editar PTM</a>
-        <a class="btn btn-danger" href="{% url 'ptm_delete' ptm.pk %}">Excluir PTM</a>
-      {% endif %}
+
+    <div class="collapse" id="ptmResumoCollapse">
+      <div class="p-4">
+        <div class="row g-3 mb-3">
+          <div class="col-12 col-md-6 col-xl-3">
+            <div class="border rounded p-3 h-100">
+              <div class="small text-muted mb-1">Status PTM</div>
+              <div class="fw-semibold">{{ ptm.status_ptm_atual|default:"-" }}</div>
+            </div>
+          </div>
+          <div class="col-12 col-md-6 col-xl-3">
+            <div class="border rounded p-3 h-100">
+              <div class="small text-muted mb-1">Status Obra</div>
+              <div class="fw-semibold">{{ ptm.status_obra_atual|default:"-" }}</div>
+            </div>
+          </div>
+          <div class="col-12 col-md-6 col-xl-3">
+            <div class="border rounded p-3 h-100">
+              <div class="small text-muted mb-1">Data de aprovacao</div>
+              <div class="fw-semibold">{{ ptm.data_aprovacao|date:"d/m/Y"|default:"-" }}</div>
+            </div>
+          </div>
+          <div class="col-12 col-md-6 col-xl-3">
+            <div class="border rounded p-3 h-100">
+              <div class="small text-muted mb-1">Data final</div>
+              <div class="fw-semibold">{{ ptm.data_final|date:"d/m/Y"|default:"-" }}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-12 col-lg-8">
+            <div class="row g-3">
+              <div class="col-12 col-sm-6">
+                <div class="border rounded p-3 h-100 bg-light">
+                  <div class="small text-muted mb-1">Teto FEM</div>
+                  <div class="h5 mb-0">R$ {{ ptm.teto_fem|moeda_br }}</div>
+                </div>
+              </div>
+              <div class="col-12 col-sm-6">
+                <div class="border rounded p-3 h-100 bg-light">
+                  <div class="small text-muted mb-1">Investimento total</div>
+                  <div class="h5 mb-0">R$ {{ ptm.investimento_total|moeda_br }}</div>
+                </div>
+              </div>
+              <div class="col-12 col-sm-6">
+                <div class="border rounded p-3 h-100 bg-light">
+                  <div class="small text-muted mb-1">Recurso FEM</div>
+                  <div class="h5 mb-0">R$ {{ ptm.recurso_fem|moeda_br }}</div>
+                </div>
+              </div>
+              <div class="col-12 col-sm-6">
+                <div class="border rounded p-3 h-100 bg-light">
+                  <div class="small text-muted mb-1">Contrapartida</div>
+                  <div class="h5 mb-0">R$ {{ ptm.contrapartida|moeda_br }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-lg-4">
+            <div class="border rounded h-100">
+              <div class="p-3 border-bottom">
+                <div class="small text-muted">Dados complementares</div>
+              </div>
+              <div class="p-3">
+                <dl class="row mb-0 small">
+                  <dt class="col-5 text-muted fw-normal">Conta PTM</dt>
+                  <dd class="col-7 fw-semibold">{{ ptm.conta_ptm|default:"-" }}</dd>
+                  <dt class="col-5 text-muted fw-normal">Populacao</dt>
+                  <dd class="col-7 fw-semibold">{{ ptm.populacao_beneficiada|default:"-" }}</dd>
+                  <dt class="col-5 text-muted fw-normal">Municipio</dt>
+                  <dd class="col-7 fw-semibold">{{ ptm.municipio }}</dd>
+                  <dt class="col-5 text-muted fw-normal">Regiao</dt>
+                  <dd class="col-7 fw-semibold">{{ ptm.regiao|default:"-" }}</dd>
+                </dl>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {% if ptm.projeto_detalhado or ptm.descricao or ptm.ressalva %}
+          <div class="row g-3 mt-1">
+            {% if ptm.projeto_detalhado %}
+              <div class="col-12 col-xl-6">
+                <div class="border rounded p-3 h-100">
+                  <div class="small text-muted mb-2">Projeto detalhado</div>
+                  <div>{{ ptm.projeto_detalhado }}</div>
+                </div>
+              </div>
+            {% endif %}
+            {% if ptm.descricao or ptm.ressalva %}
+              <div class="col-12 col-xl-6">
+                <div class="border rounded p-3 h-100">
+                  {% if ptm.descricao %}
+                    <div class="small text-muted mb-2">Descricao</div>
+                    <div class="{% if ptm.ressalva %}mb-3{% endif %}">{{ ptm.descricao }}</div>
+                  {% endif %}
+                  {% if ptm.ressalva %}
+                    <div class="small text-muted mb-2">Ressalva</div>
+                    <div>{{ ptm.ressalva }}</div>
+                  {% endif %}
+                </div>
+              </div>
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
     </div>
   </div>
 </div>
@@ -49,19 +169,65 @@
   <div class="card-body">
     {% if tab == 'eventos' %}
       {% if can_edit_ptm %}
-        <div class="mb-3"><a class="btn btn-primary" href="{% url 'evento_create' ptm.pk %}">Novo Evento</a></div>
+        <div class="mb-3">
+          <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createEventoModal">
+            Novo Evento
+          </button>
+        </div>
       {% endif %}
       <div class="table-responsive">
         <table class="table table-striped table-hover">
-          <thead class="table-light"><tr><th>Data</th><th>Status PTM</th><th>Status Obra</th><th>Descricao</th></tr></thead>
+          <thead class="table-light"><tr><th>Data</th><th>Status PTM</th><th>Status Obra</th><th>Descricao</th><th class="text-end"></th></tr></thead>
           <tbody>
-          {% for item in eventos %}<tr><td>{{ item.data_evento }}</td><td>{{ item.status_ptm }}</td><td>{{ item.status_obra }}</td><td>{{ item.descricao }}</td></tr>{% empty %}<tr><td colspan="4">Sem eventos.</td></tr>{% endfor %}
+          {% for item in eventos %}
+            <tr>
+              <td>{{ item.data_evento }}</td>
+              <td>{{ item.status_ptm }}</td>
+              <td>{{ item.status_obra }}</td>
+              <td>{{ item.descricao }}</td>
+              <td class="text-end">
+                <div class="d-inline-flex gap-1 flex-nowrap">
+                  {% if can_edit_ptm %}
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-primary"
+                      data-bs-toggle="modal"
+                      data-bs-target="#editEventoModal"
+                      data-action="{% url 'evento_update' ptm.pk item.pk %}"
+                      data-data-evento="{{ item.data_evento|date:'Y-m-d' }}"
+                      data-status-ptm="{{ item.status_ptm_id|default:'' }}"
+                      data-status-obra="{{ item.status_obra_id|default:'' }}"
+                      data-descricao="{{ item.descricao }}"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-danger"
+                      data-bs-toggle="modal"
+                      data-bs-target="#deleteEventoModal"
+                      data-action="{% url 'evento_delete' ptm.pk item.pk %}"
+                      data-label="{{ item.data_evento|default:'evento' }}"
+                    >
+                      Excluir
+                    </button>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="5">Sem eventos.</td></tr>
+          {% endfor %}
           </tbody>
         </table>
       </div>
     {% elif tab == 'pagamentos' %}
       {% if can_edit_ptm %}
-        <div class="mb-3"><a class="btn btn-primary" href="{% url 'pagamento_create' ptm.pk %}">Novo Pagamento</a></div>
+        <div class="mb-3">
+          <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createPagamentoModal">
+            Novo Pagamento
+          </button>
+        </div>
       {% endif %}
       <div class="table-responsive">
         <table class="table table-striped table-hover">
@@ -343,6 +509,187 @@
         </table>
       </div>
     {% endif %}
+  </div>
+</div>
+
+<div class="modal fade" id="createEventoModal" tabindex="-1" aria-labelledby="createEventoLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'evento_create' ptm.pk %}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="createEventoLabel">Novo Evento</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="id_create_evento_data" class="form-label">Data</label>
+            <input type="date" class="form-control" name="data_evento" id="id_create_evento_data">
+          </div>
+          <div class="mb-3">
+            <label for="id_create_evento_status_ptm" class="form-label">Status PTM</label>
+            <select class="form-select" name="status_ptm" id="id_create_evento_status_ptm">
+              <option value="">---------</option>
+              {% for status in status_ptm_options %}
+                <option value="{{ status.id }}">{{ status.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="id_create_evento_status_obra" class="form-label">Status Obra</label>
+            <select class="form-select" name="status_obra" id="id_create_evento_status_obra">
+              <option value="">---------</option>
+              {% for status in status_obra_options %}
+                <option value="{{ status.id }}">{{ status.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-0">
+            <label for="id_create_evento_descricao" class="form-label">Descricao</label>
+            <textarea class="form-control" rows="4" name="descricao" id="id_create_evento_descricao"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="editEventoModal" tabindex="-1" aria-labelledby="editEventoLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" id="editEventoForm">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="editEventoLabel">Editar Evento</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="id_edit_evento_data" class="form-label">Data</label>
+            <input type="date" class="form-control" name="data_evento" id="id_edit_evento_data">
+          </div>
+          <div class="mb-3">
+            <label for="id_edit_evento_status_ptm" class="form-label">Status PTM</label>
+            <select class="form-select" name="status_ptm" id="id_edit_evento_status_ptm">
+              <option value="">---------</option>
+              {% for status in status_ptm_options %}
+                <option value="{{ status.id }}">{{ status.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="id_edit_evento_status_obra" class="form-label">Status Obra</label>
+            <select class="form-select" name="status_obra" id="id_edit_evento_status_obra">
+              <option value="">---------</option>
+              {% for status in status_obra_options %}
+                <option value="{{ status.id }}">{{ status.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-0">
+            <label for="id_edit_evento_descricao" class="form-label">Descricao</label>
+            <textarea class="form-control" rows="4" name="descricao" id="id_edit_evento_descricao"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="deleteEventoModal" tabindex="-1" aria-labelledby="deleteEventoLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="deleteEventoForm" method="post">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="deleteEventoLabel">Excluir Evento</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-0">Confirma excluir <strong id="deleteEventoName">este evento</strong>?</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-danger">Excluir</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="createPagamentoModal" tabindex="-1" aria-labelledby="createPagamentoLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'pagamento_create' ptm.pk %}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="createPagamentoLabel">Novo Pagamento</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="id_create_pag_parcela" class="form-label">Parcela</label>
+            <select class="form-select" name="parcela" id="id_create_pag_parcela">
+              <option value="1">1a</option>
+              <option value="2">2a</option>
+              <option value="3">3a</option>
+              <option value="4">4a</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="id_create_pag_tipo_registro" class="form-label">Tipo</label>
+            <select class="form-select" name="tipo_registro" id="id_create_pag_tipo_registro">
+              <option value="normal">Normal</option>
+              <option value="extra">Extra</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="id_create_pag_dt_solicitacao" class="form-label">Dt Solicitacao</label>
+            <input type="date" class="form-control" name="dt_solicitacao" id="id_create_pag_dt_solicitacao">
+          </div>
+          <div class="mb-3">
+            <label for="id_create_pag_dt_envio_pg" class="form-label">Dt Envio Pg</label>
+            <input type="date" class="form-control" name="dt_envio_pg" id="id_create_pag_dt_envio_pg">
+          </div>
+          <div class="mb-3">
+            <label for="id_create_pag_dt_pagamento" class="form-label">Dt Pagamento</label>
+            <input type="date" class="form-control" name="dt_pagamento" id="id_create_pag_dt_pagamento">
+          </div>
+          <div class="mb-3">
+            <label for="id_create_pag_valor_previsto" class="form-label">Valor Previsto</label>
+            <input type="number" step="0.01" class="form-control" name="valor_previsto" id="id_create_pag_valor_previsto">
+          </div>
+          <div class="mb-3">
+            <label for="id_create_pag_valor_realizado" class="form-label">Valor Realizado</label>
+            <input type="number" step="0.01" class="form-control" name="valor_realizado" id="id_create_pag_valor_realizado">
+          </div>
+          <div class="mb-3">
+            <label for="id_create_pag_numero_ob" class="form-label">Numero OB</label>
+            <input type="text" class="form-control" name="numero_ob" id="id_create_pag_numero_ob">
+          </div>
+          <div class="mb-3">
+            <label for="id_create_pag_numero_empenho" class="form-label">Numero Empenho</label>
+            <input type="text" class="form-control" name="numero_empenho" id="id_create_pag_numero_empenho">
+          </div>
+          <div class="mb-0">
+            <label for="id_create_pag_observacao" class="form-label">Observacao</label>
+            <textarea class="form-control" rows="3" name="observacao" id="id_create_pag_observacao"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
   </div>
 </div>
 
@@ -843,6 +1190,28 @@
 
 {% block extra_scripts %}
 <script>
+  const editEventoModal = document.getElementById("editEventoModal");
+  if (editEventoModal) {
+    editEventoModal.addEventListener("show.bs.modal", function (event) {
+      const button = event.relatedTarget;
+      const form = document.getElementById("editEventoForm");
+      form.action = button.getAttribute("data-action");
+      document.getElementById("id_edit_evento_data").value = button.getAttribute("data-data-evento") || "";
+      document.getElementById("id_edit_evento_status_ptm").value = button.getAttribute("data-status-ptm") || "";
+      document.getElementById("id_edit_evento_status_obra").value = button.getAttribute("data-status-obra") || "";
+      document.getElementById("id_edit_evento_descricao").value = button.getAttribute("data-descricao") || "";
+    });
+  }
+
+  const deleteEventoModal = document.getElementById("deleteEventoModal");
+  if (deleteEventoModal) {
+    deleteEventoModal.addEventListener("show.bs.modal", function (event) {
+      const button = event.relatedTarget;
+      document.getElementById("deleteEventoForm").action = button.getAttribute("data-action");
+      document.getElementById("deleteEventoName").textContent = button.getAttribute("data-label") || "este evento";
+    });
+  }
+
   const editPagamentoModal = document.getElementById("editPagamentoModal");
   if (editPagamentoModal) {
     editPagamentoModal.addEventListener("show.bs.modal", function (event) {

@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% load number_formats %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+      <div>
+        <h1 class="h4 mb-1">Dashboard FEM</h1>
+        <p class="text-muted mb-0">Resumo operacional e financeiro da carteira de PTMs.</p>
+      </div>
+      <a class="btn btn-outline-secondary" href="{% url 'ptm_list' %}">Ver lista de PTMs</a>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-12 col-sm-6 col-xl-2">
+        <div class="border rounded p-3 h-100 bg-light">
+          <div class="small text-muted">Total de PTMs</div>
+          <div class="h3 mb-0">{{ kpi_total_ptms }}</div>
+        </div>
+      </div>
+      <div class="col-12 col-sm-6 col-xl-2">
+        <div class="border rounded p-3 h-100 bg-light">
+          <div class="small text-muted">Teto FEM</div>
+          <div class="h5 mb-0">R$ {{ kpi_total_teto_fem|moeda_br }}</div>
+        </div>
+      </div>
+      <div class="col-12 col-sm-6 col-xl-2">
+        <div class="border rounded p-3 h-100 bg-light">
+          <div class="small text-muted">Valor pago</div>
+          <div class="h5 mb-0">R$ {{ kpi_total_pago|moeda_br }}</div>
+        </div>
+      </div>
+      <div class="col-12 col-sm-6 col-xl-2">
+        <div class="border rounded p-3 h-100 bg-light">
+          <div class="small text-muted">Saldo a pagar</div>
+          <div class="h5 mb-0">R$ {{ kpi_total_saldo|moeda_br }}</div>
+        </div>
+      </div>
+      <div class="col-12 col-sm-6 col-xl-2">
+        <div class="border rounded p-3 h-100 bg-light">
+          <div class="small text-muted">Execucao financeira</div>
+          <div class="h3 mb-0">{{ kpi_execucao_financeira_pct }}%</div>
+        </div>
+      </div>
+      <div class="col-12 col-sm-6 col-xl-2">
+        <div class="border rounded p-3 h-100 bg-light">
+          <div class="small text-muted">Pagamentos pendentes</div>
+          <div class="h3 mb-0">{{ kpi_pagamento_pendente }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-12 col-lg-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h2 class="h6 mb-0">Alertas de prestacao</h2>
+          <span class="badge text-bg-danger">{{ kpi_prestacao_vencida }} vencidas</span>
+        </div>
+        <div class="small text-muted mb-3">PTMs com prazo expirado e sem regularizacao registrada.</div>
+        <ul class="list-group list-group-flush">
+          {% for item in alertas_prestacao %}
+            <li class="list-group-item px-0">
+              <div class="fw-semibold">{{ item.ptm.ordem }} - {{ item.ptm.municipio }}</div>
+              <div class="small text-muted">Prazo: {{ item.prazo_contas|date:"d/m/Y" }}</div>
+            </li>
+          {% empty %}
+            <li class="list-group-item px-0 text-muted">Nenhuma prestacao vencida.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h2 class="h6 mb-0">Alertas de vistoria</h2>
+          <span class="badge text-bg-warning">{{ kpi_vistoria_desatualizada }} desatualizadas</span>
+        </div>
+        <div class="small text-muted mb-3">Ultima resposta ou solicitacao com mais de 90 dias.</div>
+        <ul class="list-group list-group-flush">
+          {% for item in alertas_vistoria %}
+            <li class="list-group-item px-0">
+              <div class="fw-semibold">{{ item.ordem }} - {{ item.municipio }}</div>
+              <div class="small text-muted">Ultima resposta: {{ item.ultima_vistoria_resposta|date:"d/m/Y"|default:"-" }}</div>
+            </li>
+          {% empty %}
+            <li class="list-group-item px-0 text-muted">Nenhuma vistoria desatualizada.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h2 class="h6 mb-0">Maior saldo a receber</h2>
+          <span class="badge text-bg-primary">{{ kpi_sem_vistoria }} sem vistoria</span>
+        </div>
+        <div class="small text-muted mb-3">PTMs com maior diferenca entre teto FEM e total pago.</div>
+        <ul class="list-group list-group-flush">
+          {% for item in alertas_saldo %}
+            <li class="list-group-item px-0">
+              <div class="fw-semibold">{{ item.ordem }} - {{ item.municipio }}</div>
+              <div class="small text-muted">Saldo: R$ {{ item.saldo_receber|moeda_br }}</div>
+            </li>
+          {% empty %}
+            <li class="list-group-item px-0 text-muted">Nenhum saldo pendente identificado.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-lg-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h2 class="h6 mb-0">Distribuicao por status</h2>
+          <span class="badge text-bg-light">{{ status_breakdown|length }} grupos</span>
+        </div>
+        <ul class="list-group list-group-flush">
+          {% for item in status_breakdown %}
+            <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+              <span>{{ item.status_ptm_atual__nome|default:"Sem status" }}</span>
+              <span class="badge text-bg-secondary">{{ item.total }}</span>
+            </li>
+          {% empty %}
+            <li class="list-group-item px-0 text-muted">Sem dados de status.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h2 class="h6 mb-0">Distribuicao por secretaria</h2>
+          <span class="badge text-bg-light">{{ secretaria_breakdown|length }} grupos</span>
+        </div>
+        <ul class="list-group list-group-flush">
+          {% for item in secretaria_breakdown %}
+            <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+              <span>{{ item.secretaria__nome|default:"Nao informada" }}</span>
+              <span class="badge text-bg-secondary">{{ item.total }}</span>
+            </li>
+          {% empty %}
+            <li class="list-group-item px-0 text-muted">Sem dados de secretaria.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h2 class="h6 mb-0">Top municipios</h2>
+          <span class="badge text-bg-light">{{ municipio_breakdown|length }} grupos</span>
+        </div>
+        <ul class="list-group list-group-flush">
+          {% for item in municipio_breakdown %}
+            <li class="list-group-item px-0 d-flex justify-content-between align-items-center">
+              <span>{{ item.municipio|default:"Nao informado" }}</span>
+              <span class="badge text-bg-secondary">{{ item.total }}</span>
+            </li>
+          {% empty %}
+            <li class="list-group-item px-0 text-muted">Sem dados de municipio.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

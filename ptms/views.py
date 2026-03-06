@@ -2,13 +2,15 @@ from decimal import Decimal, InvalidOperation
 import unicodedata
 
 from django.contrib import messages
-from django.db.models import Q
+from django.db.models import Count, DateField, DecimalField, F, OuterRef, Q, Subquery, Sum, Value
+from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
-from django.views.generic import CreateView, DeleteView, DetailView, ListView, UpdateView
+from django.utils import timezone
+from django.views.generic import CreateView, DeleteView, DetailView, ListView, TemplateView, UpdateView
 
 from conclusao_informal.models import ConclusaoInformalPTM
-from core.models import StatusPTM
+from core.models import StatusObra, StatusPTM
 from eventos.models import EventoPTM
 from observacoes.models import ObservacaoEncaminhamentoPTM
 from pagamentos.models import PagamentoPTM
@@ -27,12 +29,16 @@ from ptms.models import PTM
 from vistorias.models import VistoriaPTM
 
 
-def _normalize_municipio(value):
+def _normalize_text(value):
     text = (value or "").strip()
     text = "".join(
         char for char in unicodedata.normalize("NFD", text) if unicodedata.category(char) != "Mn"
     )
     return " ".join(text.lower().split())
+
+
+def _normalize_municipio(value):
+    return _normalize_text(value)
 
 
 def _allowed_municipios_for_user(user):
@@ -63,6 +69,103 @@ def _deny_edit_if_forbidden(request, ptm, tab="eventos"):
     return redirect(f"{reverse('ptm_detail', kwargs={'pk': ptm.pk})}?tab={tab}")
 
 
+def _build_dashboard_context():
+    today = timezone.localdate()
+    stale_limit = today - timezone.timedelta(days=90)
+
+    latest_vistoria = VistoriaPTM.objects.filter(ptm=OuterRef("pk")).order_by("-ordem_vistoria", "-id")
+    latest_evento = EventoPTM.objects.filter(ptm=OuterRef("pk")).order_by("-data_evento", "-id")
+
+    kpi_base = PTM.objects.annotate(
+        total_pago=Coalesce(
+            Sum("pagamentos__valor_realizado"),
+            Value(Decimal("0.00")),
+            output_field=DecimalField(max_digits=14, decimal_places=2),
+        ),
+        parcelas_count=Count("pagamentos__parcela", distinct=True),
+        ultima_vistoria_resposta=Subquery(
+            latest_vistoria.values("dt_resposta")[:1],
+            output_field=DateField(),
+        ),
+        ultima_vistoria_solicitacao=Subquery(
+            latest_vistoria.values("dt_solicitacao")[:1],
+            output_field=DateField(),
+        ),
+        ultimo_evento=Subquery(
+            latest_evento.values("data_evento")[:1],
+            output_field=DateField(),
+        ),
+    )
+
+    total_ptms = PTM.objects.count()
+    total_teto_fem = PTM.objects.aggregate(
+        total=Coalesce(
+            Sum("teto_fem"),
+            Value(Decimal("0.00")),
+            output_field=DecimalField(max_digits=16, decimal_places=2),
+        )
+    )["total"]
+    total_pago = kpi_base.aggregate(
+        total=Coalesce(
+            Sum("total_pago"),
+            Value(Decimal("0.00")),
+            output_field=DecimalField(max_digits=16, decimal_places=2),
+        )
+    )["total"]
+    total_saldo = total_teto_fem - total_pago
+    execucao_financeira_pct = (
+        ((total_pago / total_teto_fem) * Decimal("100")) if total_teto_fem else Decimal("0.00")
+    )
+    execucao_financeira_pct = execucao_financeira_pct.quantize(Decimal("0.01"))
+
+    return {
+        "kpi_total_ptms": total_ptms,
+        "kpi_total_teto_fem": total_teto_fem,
+        "kpi_total_pago": total_pago,
+        "kpi_total_saldo": total_saldo,
+        "kpi_execucao_financeira_pct": execucao_financeira_pct,
+        "kpi_pagamento_pendente": kpi_base.filter(
+            Q(parcelas_count=4) & Q(total_pago__lt=F("teto_fem"))
+        ).count(),
+        "kpi_sem_vistoria": PTM.objects.filter(vistorias__isnull=True).distinct().count(),
+        "kpi_vistoria_desatualizada": kpi_base.filter(vistorias__isnull=False)
+        .filter(
+            Q(ultima_vistoria_resposta__lt=stale_limit)
+            | (Q(ultima_vistoria_resposta__isnull=True) & Q(ultima_vistoria_solicitacao__lt=stale_limit))
+        )
+        .distinct()
+        .count(),
+        "kpi_prestacao_vencida": PrestacaoContaPTM.objects.filter(prazo_contas__lt=today)
+        .filter(Q(data_prestacao__isnull=True) | Q(data_prestacao__gt=F("prazo_contas")))
+        .count(),
+        "status_breakdown": PTM.objects.values("status_ptm_atual__nome")
+        .annotate(total=Count("id"))
+        .order_by("-total", "status_ptm_atual__nome")[:6],
+        "secretaria_breakdown": PTM.objects.values("secretaria__nome")
+        .annotate(total=Count("id"))
+        .order_by("-total", "secretaria__nome")[:6],
+        "municipio_breakdown": PTM.objects.values("municipio")
+        .annotate(total=Count("id"))
+        .order_by("-total", "municipio")[:6],
+        "alertas_prestacao": PrestacaoContaPTM.objects.select_related("ptm")
+        .filter(prazo_contas__lt=today)
+        .filter(Q(data_prestacao__isnull=True) | Q(data_prestacao__gt=F("prazo_contas")))
+        .order_by("prazo_contas")[:5],
+        "alertas_vistoria": kpi_base.filter(vistorias__isnull=False)
+        .filter(
+            Q(ultima_vistoria_resposta__lt=stale_limit)
+            | (Q(ultima_vistoria_resposta__isnull=True) & Q(ultima_vistoria_solicitacao__lt=stale_limit))
+        )
+        .order_by("ultima_vistoria_resposta", "ultima_vistoria_solicitacao", "ordem")
+        .distinct()[:5],
+        "alertas_saldo": kpi_base.filter(total_pago__lt=F("teto_fem"))
+        .annotate(
+            saldo_receber=F("teto_fem") - F("total_pago"),
+        )
+        .order_by("-saldo_receber", "ordem")[:5],
+    }
+
+
 class PTMListView(ListView):
     model = PTM
     template_name = "ptms/ptm_list.html"
@@ -79,13 +182,21 @@ class PTMListView(ListView):
         municipio = self.request.GET.get("municipio", "").strip()
 
         if q:
-            queryset = queryset.filter(
-                Q(ordem__icontains=q) | Q(municipio__icontains=q) | Q(projeto__icontains=q)
-            )
+            q_norm = _normalize_text(q)
+            ids = [
+                item.id
+                for item in queryset
+                if q_norm in _normalize_text(item.ordem)
+                or q_norm in _normalize_text(item.municipio)
+                or q_norm in _normalize_text(item.projeto)
+            ]
+            queryset = queryset.filter(id__in=ids)
         if status:
             queryset = queryset.filter(status_ptm_atual__id=status)
         if municipio:
-            queryset = queryset.filter(municipio__icontains=municipio)
+            municipio_norm = _normalize_text(municipio)
+            ids = [item.id for item in queryset if municipio_norm in _normalize_text(item.municipio)]
+            queryset = queryset.filter(id__in=ids)
         return queryset
 
     def get_context_data(self, **kwargs):
@@ -96,6 +207,16 @@ class PTMListView(ListView):
         context["can_create_ptm"] = self.request.user.is_superuser or bool(
             _allowed_municipios_for_user(self.request.user)
         )
+        context["total_ptms_filtrados"] = context["paginator"].count
+        return context
+
+
+class DashboardView(TemplateView):
+    template_name = "ptms/dashboard.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(_build_dashboard_context())
         return context
 
 
@@ -111,6 +232,8 @@ class PTMDetailView(DetailView):
         context["tab"] = tab
         context["eventos"] = ptm.eventos.select_related("status_ptm", "status_obra").all()
         context["pagamentos"] = ptm.pagamentos.all()
+        context["status_ptm_options"] = StatusPTM.objects.filter(ativo=True).order_by("nome")
+        context["status_obra_options"] = StatusObra.objects.filter(ativo=True).order_by("nome")
         context["vistorias"] = ptm.vistorias.all()
         context["prestacao"] = getattr(ptm, "prestacao_conta", None)
         context["prestacao_historico"] = (
@@ -190,38 +313,69 @@ class PTMDeleteView(DeleteView):
         return super().dispatch(request, *args, **kwargs)
 
 
-def _create_child(request, ptm_id, form_class, tab_name, title, save_handler=None):
+def evento_create(request, ptm_id):
     ptm = get_object_or_404(PTM, pk=ptm_id)
-    blocked = _deny_edit_if_forbidden(request, ptm, tab=tab_name)
+    blocked = _deny_edit_if_forbidden(request, ptm, tab="eventos")
     if blocked:
         return blocked
     if request.method == "POST":
-        form = form_class(request.POST)
+        form = EventoPTMForm(request.POST)
         if form.is_valid():
-            if save_handler:
-                save_handler(form, ptm)
-            else:
-                instance = form.save(commit=False)
-                instance.ptm = ptm
-                instance.save()
-            messages.success(request, "Registro incluido com sucesso.")
-            return redirect(f"{reverse('ptm_detail', kwargs={'pk': ptm.pk})}?tab={tab_name}")
-    else:
-        form = form_class()
-
-    return render(
-        request,
-        "ptms/child_form.html",
-        {"form": form, "ptm": ptm, "title": title, "tab": tab_name},
-    )
+            instance = form.save(commit=False)
+            instance.ptm = ptm
+            instance.save()
+            messages.success(request, "Evento criado com sucesso.")
+        else:
+            errors = "; ".join(f"{field}: {', '.join(msgs)}" for field, msgs in form.errors.items())
+            messages.error(request, f"Nao foi possivel criar evento. {errors}")
+    return redirect(f"{reverse('ptm_detail', kwargs={'pk': ptm.pk})}?tab=eventos")
 
 
-def evento_create(request, ptm_id):
-    return _create_child(request, ptm_id, EventoPTMForm, "eventos", "Novo Evento")
+def evento_update(request, ptm_id, evento_id):
+    ptm = get_object_or_404(PTM, pk=ptm_id)
+    blocked = _deny_edit_if_forbidden(request, ptm, tab="eventos")
+    if blocked:
+        return blocked
+    evento = get_object_or_404(EventoPTM, pk=evento_id, ptm=ptm)
+    if request.method == "POST":
+        form = EventoPTMForm(request.POST, instance=evento)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Evento atualizado com sucesso.")
+        else:
+            errors = "; ".join(f"{field}: {', '.join(msgs)}" for field, msgs in form.errors.items())
+            messages.error(request, f"Nao foi possivel atualizar evento. {errors}")
+    return redirect(f"{reverse('ptm_detail', kwargs={'pk': ptm.pk})}?tab=eventos")
+
+
+def evento_delete(request, ptm_id, evento_id):
+    ptm = get_object_or_404(PTM, pk=ptm_id)
+    blocked = _deny_edit_if_forbidden(request, ptm, tab="eventos")
+    if blocked:
+        return blocked
+    evento = get_object_or_404(EventoPTM, pk=evento_id, ptm=ptm)
+    if request.method == "POST":
+        evento.delete()
+        messages.success(request, "Evento excluido com sucesso.")
+    return redirect(f"{reverse('ptm_detail', kwargs={'pk': ptm.pk})}?tab=eventos")
 
 
 def pagamento_create(request, ptm_id):
-    return _create_child(request, ptm_id, PagamentoPTMForm, "pagamentos", "Novo Pagamento")
+    ptm = get_object_or_404(PTM, pk=ptm_id)
+    blocked = _deny_edit_if_forbidden(request, ptm, tab="pagamentos")
+    if blocked:
+        return blocked
+    if request.method == "POST":
+        form = PagamentoPTMForm(request.POST)
+        if form.is_valid():
+            instance = form.save(commit=False)
+            instance.ptm = ptm
+            instance.save()
+            messages.success(request, "Pagamento criado com sucesso.")
+        else:
+            errors = "; ".join(f"{field}: {', '.join(msgs)}" for field, msgs in form.errors.items())
+            messages.error(request, f"Nao foi possivel criar pagamento. {errors}")
+    return redirect(f"{reverse('ptm_detail', kwargs={'pk': ptm.pk})}?tab=pagamentos")
 
 
 def pagamento_update(request, ptm_id, pagamento_id):

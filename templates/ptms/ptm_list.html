@@ -2,35 +2,51 @@
 {% block title %}PTMs{% endblock %}
 {% block content %}
 <div class="card shadow-sm mb-3">
-  <div class="card-body">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-      <h1 class="h4 mb-0">Lista de PTMs</h1>
-      {% if can_create_ptm %}
-        <a class="btn btn-primary" href="{% url 'ptm_create' %}">Novo PTM</a>
-      {% endif %}
+  <div class="card-body p-0">
+    <div class="p-4 border-bottom bg-light-subtle">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+          <span class="badge text-bg-light border mb-2">Cadastro Central</span>
+          <h1 class="h4 mb-1">Lista de PTMs</h1>
+          <p class="text-muted mb-0">
+            Consulte a base principal, filtre por municipio e status e acesse o historico operacional de cada PTM.
+          </p>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <span class="badge text-bg-secondary">{{ total_ptms_filtrados }} registro{{ total_ptms_filtrados|pluralize }}</span>
+          {% if can_create_ptm %}
+            <a class="btn btn-primary" href="{% url 'ptm_create' %}">Novo PTM</a>
+          {% endif %}
+        </div>
+      </div>
     </div>
-    <form method="get" class="row g-2">
-      <div class="col-md-4">
-        <input class="form-control" type="text" name="q" placeholder="Buscar por ordem, município ou projeto" value="{{ request.GET.q }}">
-      </div>
-      <div class="col-md-3">
-        <input class="form-control" type="text" name="municipio" placeholder="Município" value="{{ request.GET.municipio }}">
-      </div>
-      <div class="col-md-3">
-        <select class="form-select" name="status">
-          <option value="">Status PTM (todos)</option>
-          {% for id, nome in status_options %}
-            {% if id %}
-              <option value="{{ id }}" {% if request.GET.status == id|stringformat:"s" %}selected{% endif %}>{{ nome }}</option>
-            {% endif %}
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-md-2 d-flex gap-2">
-        <button type="submit" class="btn btn-primary w-100">Filtrar</button>
-        <a class="btn btn-outline-secondary w-100" href="{% url 'ptm_list' %}">Limpar</a>
-      </div>
-    </form>
+    <div class="p-4">
+      <form method="get" class="row g-3">
+        <div class="col-12 col-lg-5">
+          <label class="form-label small text-muted mb-1" for="id_q">Busca geral</label>
+          <input class="form-control" id="id_q" type="text" name="q" placeholder="Buscar por ordem, municipio ou projeto" value="{{ request.GET.q }}">
+        </div>
+        <div class="col-12 col-md-6 col-lg-3">
+          <label class="form-label small text-muted mb-1" for="id_municipio">Municipio</label>
+          <input class="form-control" id="id_municipio" type="text" name="municipio" placeholder="Todos" value="{{ request.GET.municipio }}">
+        </div>
+        <div class="col-12 col-md-6 col-lg-2">
+          <label class="form-label small text-muted mb-1" for="id_status">Status PTM</label>
+          <select class="form-select" id="id_status" name="status">
+            <option value="">Todos</option>
+            {% for id, nome in status_options %}
+              {% if id %}
+                <option value="{{ id }}" {% if request.GET.status == id|stringformat:"s" %}selected{% endif %}>{{ nome }}</option>
+              {% endif %}
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-lg-2 d-flex align-items-end gap-2">
+          <button type="submit" class="btn btn-primary w-100">Aplicar</button>
+          <a class="btn btn-outline-secondary w-100" href="{% url 'ptm_list' %}">Limpar</a>
+        </div>
+      </form>
+    </div>
   </div>
 </div>
 
@@ -40,7 +56,7 @@
       <thead class="table-light">
         <tr>
           <th>Ordem</th>
-          <th>Município</th>
+          <th>Municipio</th>
           <th>Projeto</th>
           <th>Status PTM</th>
           <th>Status Obra</th>
@@ -64,14 +80,42 @@
     </table>
   </div>
 
-  <div class="card-body d-flex align-items-center gap-2 flex-wrap">
-    {% if page_obj.has_previous %}
-      <a class="btn btn-outline-secondary btn-sm" href="?page={{ page_obj.previous_page_number }}&q={{ request.GET.q }}&municipio={{ request.GET.municipio }}&status={{ request.GET.status }}">Anterior</a>
-    {% endif %}
-    <span class="text-muted">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
-    {% if page_obj.has_next %}
-      <a class="btn btn-outline-secondary btn-sm" href="?page={{ page_obj.next_page_number }}&q={{ request.GET.q }}&municipio={{ request.GET.municipio }}&status={{ request.GET.status }}">Próxima</a>
-    {% endif %}
+  <div class="card-body">
+    <nav aria-label="Paginacao PTMs">
+      <ul class="pagination pagination-sm mb-0 flex-wrap">
+        {% if page_obj.has_previous %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.previous_page_number }}&q={{ request.GET.q }}&municipio={{ request.GET.municipio }}&status={{ request.GET.status }}">Anterior</a>
+          </li>
+        {% else %}
+          <li class="page-item disabled"><span class="page-link">Anterior</span></li>
+        {% endif %}
+
+        {% for num in page_obj.paginator.page_range %}
+          {% if num == page_obj.number %}
+            <li class="page-item active" aria-current="page"><span class="page-link">{{ num }}</span></li>
+          {% elif num >= page_obj.number|add:'-2' and num <= page_obj.number|add:'2' %}
+            <li class="page-item">
+              <a class="page-link" href="?page={{ num }}&q={{ request.GET.q }}&municipio={{ request.GET.municipio }}&status={{ request.GET.status }}">{{ num }}</a>
+            </li>
+          {% elif num == 1 or num == page_obj.paginator.num_pages %}
+            <li class="page-item">
+              <a class="page-link" href="?page={{ num }}&q={{ request.GET.q }}&municipio={{ request.GET.municipio }}&status={{ request.GET.status }}">{{ num }}</a>
+            </li>
+          {% elif num == page_obj.number|add:'-3' or num == page_obj.number|add:'3' %}
+            <li class="page-item disabled"><span class="page-link">...</span></li>
+          {% endif %}
+        {% endfor %}
+
+        {% if page_obj.has_next %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ request.GET.q }}&municipio={{ request.GET.municipio }}&status={{ request.GET.status }}">Proxima</a>
+          </li>
+        {% else %}
+          <li class="page-item disabled"><span class="page-link">Proxima</span></li>
+        {% endif %}
+      </ul>
+    </nav>
   </div>
 </div>
 {% endblock %}

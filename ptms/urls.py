@@ -1,6 +1,7 @@
 ﻿from django.urls import path
 
 from ptms.views import (
+    DashboardView,
     PTMCreateView,
     PTMDeleteView,
     PTMDetailView,
@@ -10,6 +11,8 @@ from ptms.views import (
     conclusao_delete,
     conclusao_update,
     evento_create,
+    evento_delete,
+    evento_update,
     observacao_create,
     observacao_delete,
     observacao_update,
@@ -28,12 +31,15 @@ from ptms.views import (
 
 urlpatterns = [
     path('', PTMListView.as_view(), name='ptm_list'),
+    path('dashboard/', DashboardView.as_view(), name='dashboard'),
     path('ptms/novo/', PTMCreateView.as_view(), name='ptm_create'),
     path('ptms/<int:pk>/', PTMDetailView.as_view(), name='ptm_detail'),
     path('ptms/<int:pk>/editar/', PTMUpdateView.as_view(), name='ptm_update'),
     path('ptms/<int:pk>/excluir/', PTMDeleteView.as_view(), name='ptm_delete'),
 
     path('ptms/<int:ptm_id>/eventos/novo/', evento_create, name='evento_create'),
+    path('ptms/<int:ptm_id>/eventos/<int:evento_id>/editar/', evento_update, name='evento_update'),
+    path('ptms/<int:ptm_id>/eventos/<int:evento_id>/excluir/', evento_delete, name='evento_delete'),
     path('ptms/<int:ptm_id>/pagamentos/novo/', pagamento_create, name='pagamento_create'),
     path('ptms/<int:ptm_id>/pagamentos/<int:pagamento_id>/editar/', pagamento_update, name='pagamento_update'),
     path('ptms/<int:ptm_id>/pagamentos/<int:pagamento_id>/excluir/', pagamento_delete, name='pagamento_delete'),

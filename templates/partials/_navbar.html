@@ -1,7 +1,11 @@
 <nav class="navbar navbar-expand-lg navbar-dark" style="background-color:#0c3c60;">
   <div class="container-fluid app-main">
     <a class="navbar-brand fw-semibold" href="{% url 'ptm_list' %}">FEM - Controle PTM</a>
-    <div class="d-flex align-items-center gap-2">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      {% if user.is_authenticated %}
+        <a class="btn btn-sm btn-outline-light" href="{% url 'ptm_list' %}">PTMs</a>
+        <a class="btn btn-sm btn-outline-light" href="{% url 'dashboard' %}">Dashboard</a>
+      {% endif %}
       {% if user.is_authenticated %}
         <span class="text-white-50 small">{{ user.username }}</span>
         <a class="btn btn-sm btn-outline-light" href="{% url 'core:profile' %}">Meu Perfil</a>
