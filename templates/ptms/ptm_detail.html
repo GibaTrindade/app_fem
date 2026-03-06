@@ -7,17 +7,16 @@
       <div class="col-lg-7">
         <h1 class="h4">{{ ptm.ordem }} - {{ ptm.municipio }}</h1>
         <p class="mb-2"><strong>Projeto:</strong> {{ ptm.projeto }}</p>
-        <p class="mb-0">
-          <strong>Status PTM:</strong> {{ ptm.status_ptm_atual|default:"-" }} |
-          <strong>Status Obra:</strong> {{ ptm.status_obra_atual|default:"-" }}
-        </p>
+        <p class="mb-2"><strong>Status PTM:</strong> {{ ptm.status_ptm_atual|default:"-" }}</p> 
+        <p class="mb-2"><strong>Status Obra:</strong> {{ ptm.status_obra_atual|default:"-" }}</p>
+        
       </div>
       <div class="col-lg-5">
         <ul class="list-group list-group-flush">
-          <li class="list-group-item px-0"><strong>TETO FEM:</strong> {{ ptm.teto_fem|default:"-" }}</li>
-          <li class="list-group-item px-0"><strong>INVESTIMENTO TOTAL:</strong> {{ ptm.investimento_total|default:"-" }}</li>
-          <li class="list-group-item px-0"><strong>RECURSO FEM:</strong> {{ ptm.recurso_fem|default:"-" }}</li>
-          <li class="list-group-item px-0"><strong>CONTRAPARTIDA:</strong> {{ ptm.contrapartida|default:"-" }}</li>
+          <li class="list-group-item px-0"><strong>TETO FEM:</strong> {{ ptm.teto_fem|floatformat:"2g" }}</li>
+          <li class="list-group-item px-0"><strong>INVESTIMENTO TOTAL:</strong> {{ ptm.investimento_total|floatformat:"2g" }}</li>
+          <li class="list-group-item px-0"><strong>RECURSO FEM:</strong> {{ ptm.recurso_fem|floatformat:"2g" }}</li>
+          <li class="list-group-item px-0"><strong>CONTRAPARTIDA:</strong> {{ ptm.contrapartida|floatformat:"2g" }}</li>
           <li class="list-group-item px-0"><strong>SECRETARIA:</strong> {{ ptm.secretaria|default:"-" }}</li>
           <li class="list-group-item px-0"><strong>CONTA PTM:</strong> {{ ptm.conta_ptm|default:"-" }}</li>
         </ul>
@@ -66,9 +65,55 @@
       {% endif %}
       <div class="table-responsive">
         <table class="table table-striped table-hover">
-          <thead class="table-light"><tr><th>Parcela</th><th>Tipo</th><th>Valor Previsto</th><th>Valor Realizado</th><th>Data Pg</th><th>OB</th></tr></thead>
+          <thead class="table-light"><tr><th>Parcela</th><th>Tipo</th><th>Valor Previsto</th><th>Valor Realizado</th><th>Data Pg</th><th>OB</th><th class="text-end"></th></tr></thead>
           <tbody>
-          {% for item in pagamentos %}<tr><td>{{ item.get_parcela_display }}</td><td>{{ item.get_tipo_registro_display }}</td><td>{{ item.valor_previsto }}</td><td>{{ item.valor_realizado }}</td><td>{{ item.dt_pagamento|default:"-" }}</td><td>{{ item.numero_ob|default:"-" }}</td></tr>{% empty %}<tr><td colspan="6">Sem pagamentos.</td></tr>{% endfor %}
+          {% for item in pagamentos %}
+            <tr>
+              <td>{{ item.get_parcela_display }}</td>
+              <td>{{ item.get_tipo_registro_display }}</td>
+              <td>{{ item.valor_previsto|floatformat:"2g" }}</td>
+              <td>{{ item.valor_realizado|floatformat:"2g" }}</td>
+              <td>{{ item.dt_pagamento|default:"-" }}</td>
+              <td>{{ item.numero_ob|default:"-" }}</td>
+              <td class="text-end">
+                <div class="d-inline-flex gap-1 flex-nowrap">
+                  {% if can_edit_ptm %}
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-primary"
+                      data-bs-toggle="modal"
+                      data-bs-target="#editPagamentoModal"
+                      data-action="{% url 'pagamento_update' ptm.pk item.pk %}"
+                      data-parcela="{{ item.parcela }}"
+                      data-tipo-registro="{{ item.tipo_registro }}"
+                      data-dt-solicitacao="{{ item.dt_solicitacao|date:'Y-m-d' }}"
+                      data-dt-envio-pg="{{ item.dt_envio_pg|date:'Y-m-d' }}"
+                      data-dt-pagamento="{{ item.dt_pagamento|date:'Y-m-d' }}"
+                      data-valor-previsto="{{ item.valor_previsto|stringformat:'s' }}"
+                      data-valor-realizado="{{ item.valor_realizado|stringformat:'s' }}"
+                      data-numero-ob="{{ item.numero_ob }}"
+                      data-numero-empenho="{{ item.numero_empenho }}"
+                      data-observacao="{{ item.observacao }}"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-danger"
+                      data-bs-toggle="modal"
+                      data-bs-target="#deletePagamentoModal"
+                      data-action="{% url 'pagamento_delete' ptm.pk item.pk %}"
+                      data-label="Parcela {{ item.get_parcela_display }}"
+                    >
+                      Excluir
+                    </button>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="7">Sem pagamentos.</td></tr>
+          {% endfor %}
           </tbody>
         </table>
       </div>
@@ -332,6 +377,95 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
           <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="editPagamentoModal" tabindex="-1" aria-labelledby="editPagamentoLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="editPagamentoForm" method="post">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="editPagamentoLabel">Editar Pagamento</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="id_modal_pag_parcela" class="form-label">Parcela</label>
+            <select class="form-select" name="parcela" id="id_modal_pag_parcela">
+              <option value="1">1a</option>
+              <option value="2">2a</option>
+              <option value="3">3a</option>
+              <option value="4">4a</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="id_modal_pag_tipo_registro" class="form-label">Tipo</label>
+            <select class="form-select" name="tipo_registro" id="id_modal_pag_tipo_registro">
+              <option value="normal">Normal</option>
+              <option value="extra">Extra</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="id_modal_pag_dt_solicitacao" class="form-label">Dt Solicitacao</label>
+            <input type="date" class="form-control" name="dt_solicitacao" id="id_modal_pag_dt_solicitacao">
+          </div>
+          <div class="mb-3">
+            <label for="id_modal_pag_dt_envio_pg" class="form-label">Dt Envio Pg</label>
+            <input type="date" class="form-control" name="dt_envio_pg" id="id_modal_pag_dt_envio_pg">
+          </div>
+          <div class="mb-3">
+            <label for="id_modal_pag_dt_pagamento" class="form-label">Dt Pagamento</label>
+            <input type="date" class="form-control" name="dt_pagamento" id="id_modal_pag_dt_pagamento">
+          </div>
+          <div class="mb-3">
+            <label for="id_modal_pag_valor_previsto" class="form-label">Valor Previsto</label>
+            <input type="number" step="0.01" class="form-control" name="valor_previsto" id="id_modal_pag_valor_previsto">
+          </div>
+          <div class="mb-3">
+            <label for="id_modal_pag_valor_realizado" class="form-label">Valor Realizado</label>
+            <input type="number" step="0.01" class="form-control" name="valor_realizado" id="id_modal_pag_valor_realizado">
+          </div>
+          <div class="mb-3">
+            <label for="id_modal_pag_numero_ob" class="form-label">Numero OB</label>
+            <input type="text" class="form-control" name="numero_ob" id="id_modal_pag_numero_ob">
+          </div>
+          <div class="mb-3">
+            <label for="id_modal_pag_numero_empenho" class="form-label">Numero Empenho</label>
+            <input type="text" class="form-control" name="numero_empenho" id="id_modal_pag_numero_empenho">
+          </div>
+          <div class="mb-0">
+            <label for="id_modal_pag_observacao" class="form-label">Observacao</label>
+            <textarea class="form-control" rows="3" name="observacao" id="id_modal_pag_observacao"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="deletePagamentoModal" tabindex="-1" aria-labelledby="deletePagamentoLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="deletePagamentoForm" method="post">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="deletePagamentoLabel">Excluir Pagamento</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-0">Confirma excluir <strong id="deletePagamentoName">este pagamento</strong>?</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-danger">Excluir</button>
         </div>
       </form>
     </div>
@@ -709,6 +843,34 @@
 
 {% block extra_scripts %}
 <script>
+  const editPagamentoModal = document.getElementById("editPagamentoModal");
+  if (editPagamentoModal) {
+    editPagamentoModal.addEventListener("show.bs.modal", function (event) {
+      const button = event.relatedTarget;
+      const form = document.getElementById("editPagamentoForm");
+      form.action = button.getAttribute("data-action");
+      document.getElementById("id_modal_pag_parcela").value = button.getAttribute("data-parcela") || "1";
+      document.getElementById("id_modal_pag_tipo_registro").value = button.getAttribute("data-tipo-registro") || "normal";
+      document.getElementById("id_modal_pag_dt_solicitacao").value = button.getAttribute("data-dt-solicitacao") || "";
+      document.getElementById("id_modal_pag_dt_envio_pg").value = button.getAttribute("data-dt-envio-pg") || "";
+      document.getElementById("id_modal_pag_dt_pagamento").value = button.getAttribute("data-dt-pagamento") || "";
+      document.getElementById("id_modal_pag_valor_previsto").value = button.getAttribute("data-valor-previsto") || "";
+      document.getElementById("id_modal_pag_valor_realizado").value = button.getAttribute("data-valor-realizado") || "";
+      document.getElementById("id_modal_pag_numero_ob").value = button.getAttribute("data-numero-ob") || "";
+      document.getElementById("id_modal_pag_numero_empenho").value = button.getAttribute("data-numero-empenho") || "";
+      document.getElementById("id_modal_pag_observacao").value = button.getAttribute("data-observacao") || "";
+    });
+  }
+
+  const deletePagamentoModal = document.getElementById("deletePagamentoModal");
+  if (deletePagamentoModal) {
+    deletePagamentoModal.addEventListener("show.bs.modal", function (event) {
+      const button = event.relatedTarget;
+      document.getElementById("deletePagamentoForm").action = button.getAttribute("data-action");
+      document.getElementById("deletePagamentoName").textContent = button.getAttribute("data-label") || "este pagamento";
+    });
+  }
+
   const editVistoriaModal = document.getElementById("editVistoriaModal");
   if (editVistoriaModal) {
     editVistoriaModal.addEventListener("show.bs.modal", function (event) {

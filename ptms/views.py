@@ -224,6 +224,35 @@ def pagamento_create(request, ptm_id):
     return _create_child(request, ptm_id, PagamentoPTMForm, "pagamentos", "Novo Pagamento")
 
 
+def pagamento_update(request, ptm_id, pagamento_id):
+    ptm = get_object_or_404(PTM, pk=ptm_id)
+    blocked = _deny_edit_if_forbidden(request, ptm, tab="pagamentos")
+    if blocked:
+        return blocked
+    pagamento = get_object_or_404(PagamentoPTM, pk=pagamento_id, ptm=ptm)
+    if request.method == "POST":
+        form = PagamentoPTMForm(request.POST, instance=pagamento)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Pagamento atualizado com sucesso.")
+        else:
+            errors = "; ".join(f"{field}: {', '.join(msgs)}" for field, msgs in form.errors.items())
+            messages.error(request, f"Nao foi possivel atualizar pagamento. {errors}")
+    return redirect(f"{reverse('ptm_detail', kwargs={'pk': ptm.pk})}?tab=pagamentos")
+
+
+def pagamento_delete(request, ptm_id, pagamento_id):
+    ptm = get_object_or_404(PTM, pk=ptm_id)
+    blocked = _deny_edit_if_forbidden(request, ptm, tab="pagamentos")
+    if blocked:
+        return blocked
+    pagamento = get_object_or_404(PagamentoPTM, pk=pagamento_id, ptm=ptm)
+    if request.method == "POST":
+        pagamento.delete()
+        messages.success(request, "Pagamento excluido com sucesso.")
+    return redirect(f"{reverse('ptm_detail', kwargs={'pk': ptm.pk})}?tab=pagamentos")
+
+
 def vistoria_create(request, ptm_id):
     ptm = get_object_or_404(PTM, pk=ptm_id)
     blocked = _deny_edit_if_forbidden(request, ptm, tab="vistorias")

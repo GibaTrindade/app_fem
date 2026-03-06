@@ -14,6 +14,8 @@ from ptms.views import (
     observacao_delete,
     observacao_update,
     pagamento_create,
+    pagamento_delete,
+    pagamento_update,
     prestacao_delete,
     prestacao_historico_delete,
     prestacao_historico_create,
@@ -33,6 +35,8 @@ urlpatterns = [
 
     path('ptms/<int:ptm_id>/eventos/novo/', evento_create, name='evento_create'),
     path('ptms/<int:ptm_id>/pagamentos/novo/', pagamento_create, name='pagamento_create'),
+    path('ptms/<int:ptm_id>/pagamentos/<int:pagamento_id>/editar/', pagamento_update, name='pagamento_update'),
+    path('ptms/<int:ptm_id>/pagamentos/<int:pagamento_id>/excluir/', pagamento_delete, name='pagamento_delete'),
     path('ptms/<int:ptm_id>/vistorias/novo/', vistoria_create, name='vistoria_create'),
     path('ptms/<int:ptm_id>/vistorias/<int:vistoria_id>/editar/', vistoria_update, name='vistoria_update'),
     path('ptms/<int:ptm_id>/vistorias/<int:vistoria_id>/excluir/', vistoria_delete, name='vistoria_delete'),
