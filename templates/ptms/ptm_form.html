@@ -1,0 +1,15 @@
+﻿{% extends "base.html" %}
+{% block title %}Formulário PTM{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>{% if object %}Editar PTM{% else %}Novo PTM{% endif %}</h1>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <div class="actions">
+      <button type="submit" class="btn">Salvar</button>
+      <a class="btn sec" href="{% if object %}{% url 'ptm_detail' object.pk %}{% else %}{% url 'ptm_list' %}{% endif %}">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

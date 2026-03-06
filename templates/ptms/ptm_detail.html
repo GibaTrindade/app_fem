@@ -1,0 +1,63 @@
+﻿{% extends "base.html" %}
+{% block title %}PTM {{ ptm.ordem }}{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>{{ ptm.ordem }} - {{ ptm.municipio }}</h1>
+  <p><strong>Projeto:</strong> {{ ptm.projeto }}</p>
+  <p><strong>Status PTM:</strong> {{ ptm.status_ptm_atual|default:"-" }} | <strong>Status Obra:</strong> {{ ptm.status_obra_atual|default:"-" }}</p>
+  <div class="actions">
+    <a class="btn sec" href="{% url 'ptm_list' %}">Voltar</a>
+    <a class="btn" href="{% url 'ptm_update' ptm.pk %}">Editar PTM</a>
+    <a class="btn danger" href="{% url 'ptm_delete' ptm.pk %}">Excluir PTM</a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="tabs">
+    <a class="{% if tab == 'eventos' %}active{% endif %}" href="?tab=eventos">Eventos</a>
+    <a class="{% if tab == 'pagamentos' %}active{% endif %}" href="?tab=pagamentos">Pagamentos</a>
+    <a class="{% if tab == 'vistorias' %}active{% endif %}" href="?tab=vistorias">Vistorias</a>
+    <a class="{% if tab == 'prestacao' %}active{% endif %}" href="?tab=prestacao">Prestação de Contas</a>
+    <a class="{% if tab == 'observacoes' %}active{% endif %}" href="?tab=observacoes">Obs/Enc</a>
+    <a class="{% if tab == 'conclusoes' %}active{% endif %}" href="?tab=conclusoes">Conclusão Informal</a>
+  </div>
+</div>
+
+<div class="card">
+{% if tab == 'eventos' %}
+  <div class="actions"><a class="btn" href="{% url 'evento_create' ptm.pk %}">Novo Evento</a></div>
+  <table><thead><tr><th>Data</th><th>Status PTM</th><th>Status Obra</th><th>Descrição</th></tr></thead><tbody>
+  {% for item in eventos %}<tr><td>{{ item.data_evento }}</td><td>{{ item.status_ptm }}</td><td>{{ item.status_obra }}</td><td>{{ item.descricao }}</td></tr>{% empty %}<tr><td colspan="4">Sem eventos.</td></tr>{% endfor %}
+  </tbody></table>
+{% elif tab == 'pagamentos' %}
+  <div class="actions"><a class="btn" href="{% url 'pagamento_create' ptm.pk %}">Novo Pagamento</a></div>
+  <table><thead><tr><th>Parcela</th><th>Tipo</th><th>Valor Previsto</th><th>Valor Realizado</th><th>Data Pg</th><th>OB</th></tr></thead><tbody>
+  {% for item in pagamentos %}<tr><td>{{ item.get_parcela_display }}</td><td>{{ item.get_tipo_registro_display }}</td><td>{{ item.valor_previsto }}</td><td>{{ item.valor_realizado }}</td><td>{{ item.dt_pagamento|default:"-" }}</td><td>{{ item.numero_ob|default:"-" }}</td></tr>{% empty %}<tr><td colspan="6">Sem pagamentos.</td></tr>{% endfor %}
+  </tbody></table>
+{% elif tab == 'vistorias' %}
+  <div class="actions"><a class="btn" href="{% url 'vistoria_create' ptm.pk %}">Nova Vistoria</a></div>
+  <table><thead><tr><th>Data Solicitação</th><th>Data Resposta</th><th>% Execução</th><th>Observação</th></tr></thead><tbody>
+  {% for item in vistorias %}<tr><td>{{ item.dt_solicitacao|default:"-" }}</td><td>{{ item.dt_resposta|default:"-" }}</td><td>{{ item.percentual_execucao }}</td><td>{{ item.observacao|default:"-" }}</td></tr>{% empty %}<tr><td colspan="4">Sem vistorias.</td></tr>{% endfor %}
+  </tbody></table>
+{% elif tab == 'prestacao' %}
+  <div class="actions">
+    <a class="btn" href="{% url 'prestacao_upsert' ptm.pk %}">Editar Prestação</a>
+    <a class="btn sec" href="{% url 'prestacao_historico_create' ptm.pk %}">Adicionar Observação</a>
+  </div>
+  <p><strong>Prazo:</strong> {{ prestacao.prazo_contas|default:"-" }} | <strong>Data Prestação:</strong> {{ prestacao.data_prestacao|default:"-" }} | <strong>Situação:</strong> {{ prestacao.situacao|default:"-" }}</p>
+  <table><thead><tr><th>Data</th><th>Observação</th></tr></thead><tbody>
+  {% for item in prestacao_historico %}<tr><td>{{ item.data|default:"-" }}</td><td>{{ item.observacao }}</td></tr>{% empty %}<tr><td colspan="2">Sem histórico de prestação.</td></tr>{% endfor %}
+  </tbody></table>
+{% elif tab == 'observacoes' %}
+  <div class="actions"><a class="btn" href="{% url 'observacao_create' ptm.pk %}">Nova Observação/Enc</a></div>
+  <table><thead><tr><th>Data</th><th>Origem</th><th>Observação</th></tr></thead><tbody>
+  {% for item in observacoes %}<tr><td>{{ item.data|default:"-" }}</td><td>{{ item.origem|default:"-" }}</td><td>{{ item.observacao }}</td></tr>{% empty %}<tr><td colspan="3">Sem observações.</td></tr>{% endfor %}
+  </tbody></table>
+{% elif tab == 'conclusoes' %}
+  <div class="actions"><a class="btn" href="{% url 'conclusao_create' ptm.pk %}">Nova Conclusão Informal</a></div>
+  <table><thead><tr><th>% Declarado</th><th>Data</th><th>Contato</th><th>Observação</th></tr></thead><tbody>
+  {% for item in conclusoes %}<tr><td>{{ item.percentual_declarado }}</td><td>{{ item.data|default:"-" }}</td><td>{{ item.contato|default:"-" }}</td><td>{{ item.observacao|default:"-" }}</td></tr>{% empty %}<tr><td colspan="4">Sem registros.</td></tr>{% endfor %}
+  </tbody></table>
+{% endif %}
+</div>
+{% endblock %}

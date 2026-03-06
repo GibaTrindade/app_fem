@@ -1,0 +1,15 @@
+﻿{% extends "base.html" %}
+{% block title %}Excluir PTM{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Excluir PTM</h1>
+  <p>Confirma excluir <strong>{{ object }}</strong>?</p>
+  <form method="post">
+    {% csrf_token %}
+    <div class="actions">
+      <button type="submit" class="btn danger">Excluir</button>
+      <a class="btn sec" href="{% url 'ptm_detail' object.pk %}">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,63 @@
+﻿{% extends "base.html" %}
+{% block title %}PTMs{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Lista de PTMs</h1>
+  <form method="get" class="actions">
+    <input type="text" name="q" placeholder="Buscar por ordem, município ou projeto" value="{{ request.GET.q }}">
+    <input type="text" name="municipio" placeholder="Município" value="{{ request.GET.municipio }}">
+    <select name="status">
+      <option value="">Status PTM (todos)</option>
+      {% for id, nome in status_options %}
+        {% if id %}
+          <option value="{{ id }}" {% if request.GET.status == id|stringformat:"s" %}selected{% endif %}>{{ nome }}</option>
+        {% endif %}
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn">Filtrar</button>
+    <a class="btn sec" href="{% url 'ptm_list' %}">Limpar</a>
+  </form>
+  <div class="actions">
+    <a class="btn" href="{% url 'ptm_create' %}">Novo PTM</a>
+  </div>
+</div>
+
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>Ordem</th>
+        <th>Município</th>
+        <th>Projeto</th>
+        <th>Status PTM</th>
+        <th>Status Obra</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ptm in ptms %}
+        <tr>
+          <td>{{ ptm.ordem }}</td>
+          <td>{{ ptm.municipio }}</td>
+          <td>{{ ptm.projeto|truncatechars:80 }}</td>
+          <td>{{ ptm.status_ptm_atual|default:"-" }}</td>
+          <td>{{ ptm.status_obra_atual|default:"-" }}</td>
+          <td><a class="btn sec" href="{% url 'ptm_detail' ptm.pk %}">Detalhe</a></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6">Nenhum PTM encontrado.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="actions">
+    {% if page_obj.has_previous %}
+      <a class="btn sec" href="?page={{ page_obj.previous_page_number }}&q={{ request.GET.q }}&municipio={{ request.GET.municipio }}&status={{ request.GET.status }}">Anterior</a>
+    {% endif %}
+    <span>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+      <a class="btn sec" href="?page={{ page_obj.next_page_number }}&q={{ request.GET.q }}&municipio={{ request.GET.municipio }}&status={{ request.GET.status }}">Próxima</a>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
