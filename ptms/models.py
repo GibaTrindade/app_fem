@@ -1,8 +1,30 @@
-﻿from decimal import Decimal
+import secrets
+from decimal import Decimal
 
 from django.db import models
 
-from core.models import AreaInvestimento, Secretaria, StatusObra, StatusPTM, TimestampedModel, TipoFEM
+from core.models import (
+    AreaInvestimento,
+    Secretaria,
+    StatusAnaliseDocumentacao,
+    StatusObra,
+    StatusPTM,
+    TimestampedModel,
+    TipoFEM,
+)
+
+
+def gerar_codigo_acesso_publico():
+    return secrets.token_urlsafe(24)
+
+
+def upload_documento_publico_ptm(instance, filename):
+    return f"ptms/publico/{instance.ptm_id}/{filename}"
+
+
+# Compatibilidade com migracoes ja aplicadas.
+generate_public_access_token = gerar_codigo_acesso_publico
+public_document_upload_to = upload_documento_publico_ptm
 
 
 class PTM(TimestampedModel):
@@ -42,6 +64,14 @@ class PTM(TimestampedModel):
     area_investimento = models.ForeignKey(AreaInvestimento, on_delete=models.PROTECT, null=True, blank=True)
     conta_ptm = models.CharField(max_length=50, blank=True)
     descricao = models.TextField(blank=True)
+    codigo_acesso_publico = models.CharField(max_length=64, unique=True, null=True, blank=True)
+    status_analise_documentacao = models.ForeignKey(
+        StatusAnaliseDocumentacao,
+        on_delete=models.PROTECT,
+        related_name="ptms_status_analise_documentacao",
+        null=True,
+        blank=True,
+    )
 
     populacao_beneficiada = models.PositiveIntegerField(null=True, blank=True)
 
@@ -50,3 +80,28 @@ class PTM(TimestampedModel):
 
     def __str__(self):
         return f"{self.ordem} - {self.municipio}"
+
+    def garantir_codigo_acesso_publico(self):
+        if self.codigo_acesso_publico:
+            return self.codigo_acesso_publico
+        token = gerar_codigo_acesso_publico()
+        while PTM.objects.filter(codigo_acesso_publico=token).exists():
+            token = gerar_codigo_acesso_publico()
+        self.codigo_acesso_publico = token
+        return token
+
+
+class DocumentoPublicoPTM(TimestampedModel):
+    ptm = models.ForeignKey(PTM, on_delete=models.CASCADE, related_name="documentos_publicos")
+    nome_remetente = models.CharField(max_length=150)
+    contato = models.CharField(max_length=150, blank=True)
+    descricao = models.TextField(blank=True)
+    arquivo = models.FileField(upload_to=upload_documento_publico_ptm)
+
+    class Meta:
+        ordering = ("-created_at",)
+        verbose_name = "Documento Publico do PTM"
+        verbose_name_plural = "Documentos Publicos do PTM"
+
+    def __str__(self):
+        return f"{self.ptm.ordem} - {self.nome_remetente}"

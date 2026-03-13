@@ -1,4 +1,5 @@
 import os
+<<<<<<< HEAD
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -14,11 +15,19 @@ def env_bool(name, default=False):
     return value.strip().lower() in {'1', 'true', 't', 'yes', 'y', 'on'}
 
 
+=======
+
+from fem_control.env import BASE_DIR, load_environment
+
+load_environment()
+
+>>>>>>> 35ac44a4f5dda7755f4d7c7f49ff8f58b627ada1
 SECRET_KEY = 'django-insecure-8om%l#nx^dz1xzuiu733!sls-33hst-w5rp6jg-oodkn&u4hch'
-DEBUG = True
-ALLOWED_HOSTS = []
+DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+ALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', '*').split(',') if host.strip()]
 
 INSTALLED_APPS = [
+    'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -37,10 +46,12 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'core.middleware.LoginRequiredMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -97,5 +108,14 @@ TIME_ZONE = 'America/Fortaleza'
 USE_I18N = True
 USE_TZ = True
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+LOGIN_URL = '/login/'
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/login/'

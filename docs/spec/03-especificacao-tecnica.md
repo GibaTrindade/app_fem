@@ -22,7 +22,8 @@
   - ordem (única), regiao, municipio, projeto, projeto_detalhado, tipo_fem,
     data_final, teto_fem, investimento_total, recurso_fem, rendimentos_fem,
     contrapartida, status_ptm_atual, status_obra_atual, data_aprovacao,
-    ressalva, secretaria, area_investimento, conta_ptm, descricao.
+    ressalva, secretaria, area_investimento, conta_ptm, descricao,
+    codigo_acesso_publico, status_analise_documentacao.
 - `EventoPTM` (N:1 PTM)
   - data_evento, descricao, status_ptm, status_obra, ordem_cronologica.
 - `PagamentoPTM` (N:1 PTM)
@@ -38,13 +39,23 @@
   - data, observacao, origem.
 - `ConclusaoInformalPTM` (N:1 PTM)
   - percentual_declarado, data, contato, observacao.
-- Catálogos (`StatusPTM`, `StatusObra`, `TipoFEM`, `AreaInvestimento`, `Secretaria`).
+- `DocumentoPublicoPTM` (N:1 PTM)
+  - nome_remetente, contato, descricao, arquivo.
+- Catálogos (`StatusPTM`, `StatusObra`, `StatusAnaliseDocumentacao`, `TipoFEM`, `AreaInvestimento`, `Secretaria`).
 
 ## Regras de negócio iniciais
 - `PTM.ordem` único.
+- `PTM.codigo_acesso_publico` único quando preenchido.
 - Status atual do PTM recalculado automaticamente ao inserir/editar/excluir evento.
+- Status da análise da documentação controlado por catálogo para manter padronização.
 - Valores monetários em `Decimal(14,2)`.
 - Percentuais em `Decimal(5,4)` com exibição formatada em `%`.
+
+## Acesso público de documentação
+- Rota pública específica fora do fluxo autenticado para consulta resumida do PTM.
+- Upload restrito a PDF e imagens (`png`, `jpg`, `jpeg`, `webp`) com limite de tamanho.
+- Arquivos armazenados em `MEDIA_ROOT` e servidos por `/media/`.
+- Área interna do PTM com aba dedicada para consulta dos documentos enviados e atualização do status da análise.
 
 ## Migração da planilha
 1. Importador lê `INF GERAIS` e cria PTMs.

@@ -11,9 +11,9 @@ env/
 
 # Django
 *.log
-db.sqlite3
 staticfiles/
 media/
+mediafiles/
 
 # Migrations cache / test cache
 .pytest_cache/
@@ -31,3 +31,6 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+
+# DataBase
+db.sqlite3
