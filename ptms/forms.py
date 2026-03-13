@@ -7,7 +7,7 @@ from eventos.models import EventoPTM
 from observacoes.models import ObservacaoEncaminhamentoPTM
 from pagamentos.models import PagamentoPTM
 from prestacao_contas.models import PrestacaoContaHistorico, PrestacaoContaPTM
-from ptms.models import PTM
+from ptms.models import PTM, PublicDocumentPTM
 from vistorias.models import VistoriaPTM
 
 
@@ -57,12 +57,29 @@ class PTMForm(BaseBootstrapModelForm):
             "area_investimento",
             "conta_ptm",
             "descricao",
+            "public_analysis_status",
             "populacao_beneficiada",
         ]
         widgets = {
             "data_final": DateInput(),
             "data_aprovacao": DateInput(),
         }
+
+
+class PublicDocumentPTMForm(BaseBootstrapModelForm):
+    class Meta:
+        model = PublicDocumentPTM
+        fields = ["nome_remetente", "contato", "descricao", "arquivo"]
+
+    def clean_arquivo(self):
+        arquivo = self.cleaned_data["arquivo"]
+        nome = arquivo.name.lower()
+        allowed_extensions = (".pdf", ".png", ".jpg", ".jpeg", ".webp")
+        if not nome.endswith(allowed_extensions):
+            raise forms.ValidationError("Envie um arquivo PDF ou imagem (PNG, JPG ou WEBP).")
+        if arquivo.size > 10 * 1024 * 1024:
+            raise forms.ValidationError("O arquivo deve ter no maximo 10 MB.")
+        return arquivo
 
 
 class EventoPTMForm(BaseBootstrapModelForm):

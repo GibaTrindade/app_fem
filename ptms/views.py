@@ -4,6 +4,7 @@ import unicodedata
 from django.contrib import messages
 from django.db.models import Count, DateField, DecimalField, F, OuterRef, Q, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
@@ -23,9 +24,10 @@ from ptms.forms import (
     PrestacaoContaHistoricoForm,
     PrestacaoContaPTMForm,
     PTMForm,
+    PublicDocumentPTMForm,
     VistoriaPTMForm,
 )
-from ptms.models import PTM
+from ptms.models import PTM, PublicDocumentPTM
 from vistorias.models import VistoriaPTM
 
 
@@ -67,6 +69,14 @@ def _deny_edit_if_forbidden(request, ptm, tab="eventos"):
         "Voce nao tem permissao para alterar este PTM. Verifique seus municipios vinculados.",
     )
     return redirect(f"{reverse('ptm_detail', kwargs={'pk': ptm.pk})}?tab={tab}")
+
+
+def _public_ptm_url(request, ptm):
+    if not ptm.public_access_token:
+        return ""
+    return request.build_absolute_uri(
+        reverse("ptm_public_detail", kwargs={"token": ptm.public_access_token})
+    )
 
 
 def _build_dashboard_context():
@@ -241,8 +251,70 @@ class PTMDetailView(DetailView):
         )
         context["observacoes"] = ptm.observacoes_enc.all()
         context["conclusoes"] = ptm.conclusoes_informais.all()
+        context["documentos_publicos"] = ptm.documentos_publicos.all()
         context["can_edit_ptm"] = _user_can_edit_ptm(self.request.user, ptm)
+        context["public_url"] = _public_ptm_url(self.request, ptm)
         return context
+
+
+class PTMPublicDetailView(DetailView):
+    model = PTM
+    template_name = "ptms/ptm_public_detail.html"
+    context_object_name = "ptm"
+    slug_field = "public_access_token"
+    slug_url_kwarg = "token"
+
+    def get_object(self, queryset=None):
+        token = self.kwargs.get("token", "").strip()
+        if not token:
+            raise Http404
+        return get_object_or_404(
+            PTM.objects.select_related("status_ptm_atual", "status_obra_atual"),
+            public_access_token=token,
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        ptm = self.object
+        context["public_form"] = kwargs.get("public_form") or PublicDocumentPTMForm()
+        context["documentos_publicos"] = ptm.documentos_publicos.all()
+        return context
+
+
+def ptm_public_upload(request, token):
+    ptm = get_object_or_404(PTM, public_access_token=token)
+    if request.method != "POST":
+        return redirect("ptm_public_detail", token=token)
+
+    form = PublicDocumentPTMForm(request.POST, request.FILES)
+    if form.is_valid():
+        documento = form.save(commit=False)
+        documento.ptm = ptm
+        documento.save()
+        messages.success(request, "Documento enviado com sucesso para analise.")
+        return redirect("ptm_public_detail", token=token)
+
+    return render(
+        request,
+        "ptms/ptm_public_detail.html",
+        {
+            "ptm": ptm,
+            "public_form": form,
+            "documentos_publicos": ptm.documentos_publicos.all(),
+        },
+    )
+
+
+def ptm_generate_public_link(request, pk):
+    ptm = get_object_or_404(PTM, pk=pk)
+    blocked = _deny_edit_if_forbidden(request, ptm, tab=request.GET.get("tab", "eventos"))
+    if blocked:
+        return blocked
+    if request.method == "POST":
+        ptm.ensure_public_access_token()
+        ptm.save(update_fields=["public_access_token"])
+        messages.success(request, "Link publico gerado com sucesso.")
+    return redirect(f"{reverse('ptm_detail', kwargs={'pk': ptm.pk})}?tab={request.GET.get('tab', 'eventos')}")
 
 
 class PTMCreateView(CreateView):

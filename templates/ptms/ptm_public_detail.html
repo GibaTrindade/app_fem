@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% load number_formats %}
+{% block title %}PTM {{ ptm.ordem }} - Acesso Publico{% endblock %}
+{% block content %}
+<div class="row g-4">
+  <div class="col-12 col-lg-7">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+          <span class="badge text-bg-light border">PTM {{ ptm.ordem }}</span>
+          <span class="badge text-bg-secondary">{{ ptm.municipio }}</span>
+          {% if ptm.regiao %}
+            <span class="badge text-bg-light border">{{ ptm.regiao }}</span>
+          {% endif %}
+        </div>
+        <h1 class="h4 mb-2">{{ ptm.projeto }}</h1>
+        <p class="text-muted mb-4">
+          {% if ptm.secretaria %}{{ ptm.secretaria }}{% else %}Secretaria nao informada{% endif %}
+          {% if ptm.tipo_fem %} • {{ ptm.tipo_fem }}{% endif %}
+        </p>
+
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <div class="border rounded p-3 h-100">
+              <div class="small text-muted mb-1">Status PTM</div>
+              <div class="fw-semibold">{{ ptm.status_ptm_atual|default:"-" }}</div>
+            </div>
+          </div>
+          <div class="col-12 col-md-6">
+            <div class="border rounded p-3 h-100">
+              <div class="small text-muted mb-1">Status Obra</div>
+              <div class="fw-semibold">{{ ptm.status_obra_atual|default:"-" }}</div>
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="small text-muted mb-1">Status da analise da documentacao</div>
+              <div class="fw-semibold">{{ ptm.public_analysis_status|default:"Aguardando envio de documentacao." }}</div>
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="border rounded p-3">
+              <div class="small text-muted mb-1">Descricao resumida</div>
+              <div>{{ ptm.projeto_detalhado|default:ptm.descricao|default:"Sem detalhes adicionais." }}</div>
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="small text-muted mb-2">Documentos enviados</div>
+            <div class="list-group">
+              {% for item in documentos_publicos %}
+                <div class="list-group-item">
+                  <div class="d-flex justify-content-between gap-3 flex-wrap">
+                    <div>
+                      <div class="fw-semibold">{{ item.nome_remetente }}</div>
+                      <div class="small text-muted">
+                        {{ item.created_at|date:"d/m/Y H:i" }}
+                        {% if item.contato %} • {{ item.contato }}{% endif %}
+                      </div>
+                      {% if item.descricao %}
+                        <div class="mt-2">{{ item.descricao }}</div>
+                      {% endif %}
+                    </div>
+                    <div>
+                      <a class="btn btn-sm btn-outline-primary" href="{{ item.arquivo.url }}" target="_blank" rel="noopener">Abrir arquivo</a>
+                    </div>
+                  </div>
+                </div>
+              {% empty %}
+                <div class="list-group-item text-muted">Nenhum documento enviado ate o momento.</div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-5">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="h5 mb-1">Enviar documentacao</h2>
+        <p class="text-muted">Envie PDF ou imagem para apoiar a analise deste PTM.</p>
+        <form method="post" action="{% url 'ptm_public_upload' ptm.public_access_token %}" enctype="multipart/form-data">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label class="form-label" for="{{ public_form.nome_remetente.id_for_label }}">Nome</label>
+            {{ public_form.nome_remetente }}
+            {% for error in public_form.nome_remetente.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="{{ public_form.contato.id_for_label }}">Contato</label>
+            {{ public_form.contato }}
+            {% for error in public_form.contato.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="{{ public_form.descricao.id_for_label }}">Descricao</label>
+            {{ public_form.descricao }}
+            {% for error in public_form.descricao.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="{{ public_form.arquivo.id_for_label }}">Arquivo</label>
+            {{ public_form.arquivo }}
+            <div class="form-text">Aceita PDF, PNG, JPG, JPEG e WEBP ate 10 MB.</div>
+            {% for error in public_form.arquivo.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+          </div>
+          <button type="submit" class="btn btn-primary w-100">Enviar arquivo</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

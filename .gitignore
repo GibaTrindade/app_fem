@@ -13,6 +13,7 @@ env/
 *.log
 staticfiles/
 media/
+mediafiles/
 
 # Migrations cache / test cache
 .pytest_cache/

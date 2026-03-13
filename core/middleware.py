@@ -15,6 +15,7 @@ class LoginRequiredMiddleware:
             settings.LOGIN_URL,
             "/logout/",
             "/admin/",
+            "/acesso/",
             "/static/",
             "/media/",
         )

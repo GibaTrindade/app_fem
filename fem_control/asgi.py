@@ -11,6 +11,9 @@ import os
 
 from django.core.asgi import get_asgi_application
 
+from fem_control.env import load_environment
+
+load_environment()
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'fem_control.settings')
 
 application = get_asgi_application()
