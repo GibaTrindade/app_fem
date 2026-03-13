@@ -1,6 +1,19 @@
-﻿from pathlib import Path
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / '.env')
+
+
+def env_bool(name, default=False):
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {'1', 'true', 't', 'yes', 'y', 'on'}
+
+
 SECRET_KEY = 'django-insecure-8om%l#nx^dz1xzuiu733!sls-33hst-w5rp6jg-oodkn&u4hch'
 DEBUG = True
 ALLOWED_HOSTS = []
@@ -51,12 +64,26 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'fem_control.wsgi.application'
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+if os.getenv('DJANGO_DATABASE_HOST'):
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('DJANGO_DATABASE_NAME', ''),
+            'USER': os.getenv('DJANGO_DATABASE_USER', ''),
+            'PASSWORD': os.getenv('DJANGO_DATABASE_PW', ''),
+            'HOST': os.getenv('DJANGO_DATABASE_HOST', ''),
+            'PORT': os.getenv('DJANGO_DATABASE_PORT', '5432'),
+            'CONN_MAX_AGE': int(os.getenv('DJANGO_DATABASE_CONN_MAX_AGE', '60')),
+            'CONN_HEALTH_CHECKS': env_bool('DJANGO_DATABASE_CONN_HEALTH_CHECKS', True),
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
