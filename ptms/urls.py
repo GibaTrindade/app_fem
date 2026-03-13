@@ -26,6 +26,7 @@ from ptms.views import (
     prestacao_historico_update,
     prestacao_upsert,
     ptm_generate_public_link,
+    ptm_status_analise_update,
     ptm_public_upload,
     vistoria_delete,
     vistoria_create,
@@ -42,6 +43,7 @@ urlpatterns = [
     path('ptms/<int:pk>/editar/', PTMUpdateView.as_view(), name='ptm_update'),
     path('ptms/<int:pk>/excluir/', PTMDeleteView.as_view(), name='ptm_delete'),
     path('ptms/<int:pk>/gerar-link-publico/', ptm_generate_public_link, name='ptm_generate_public_link'),
+    path('ptms/<int:pk>/status-analise-documentacao/', ptm_status_analise_update, name='ptm_status_analise_update'),
 
     path('ptms/<int:ptm_id>/eventos/novo/', evento_create, name='evento_create'),
     path('ptms/<int:ptm_id>/eventos/<int:evento_id>/editar/', evento_update, name='evento_update'),

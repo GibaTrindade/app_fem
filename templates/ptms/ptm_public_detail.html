@@ -35,7 +35,7 @@
           <div class="col-12">
             <div class="border rounded p-3 h-100 bg-light">
               <div class="small text-muted mb-1">Status da analise da documentacao</div>
-              <div class="fw-semibold">{{ ptm.public_analysis_status|default:"Aguardando envio de documentacao." }}</div>
+              <div class="fw-semibold">{{ ptm.status_analise_documentacao|default:"Aguardando envio de documentacao." }}</div>
             </div>
           </div>
           <div class="col-12">
@@ -80,28 +80,28 @@
       <div class="card-body">
         <h2 class="h5 mb-1">Enviar documentacao</h2>
         <p class="text-muted">Envie PDF ou imagem para apoiar a analise deste PTM.</p>
-        <form method="post" action="{% url 'ptm_public_upload' ptm.public_access_token %}" enctype="multipart/form-data">
+        <form method="post" action="{% url 'ptm_public_upload' ptm.codigo_acesso_publico %}" enctype="multipart/form-data">
           {% csrf_token %}
           <div class="mb-3">
-            <label class="form-label" for="{{ public_form.nome_remetente.id_for_label }}">Nome</label>
-            {{ public_form.nome_remetente }}
-            {% for error in public_form.nome_remetente.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            <label class="form-label" for="{{ documento_publico_form.nome_remetente.id_for_label }}">Nome</label>
+            {{ documento_publico_form.nome_remetente }}
+            {% for error in documento_publico_form.nome_remetente.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
           </div>
           <div class="mb-3">
-            <label class="form-label" for="{{ public_form.contato.id_for_label }}">Contato</label>
-            {{ public_form.contato }}
-            {% for error in public_form.contato.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            <label class="form-label" for="{{ documento_publico_form.contato.id_for_label }}">Contato</label>
+            {{ documento_publico_form.contato }}
+            {% for error in documento_publico_form.contato.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
           </div>
           <div class="mb-3">
-            <label class="form-label" for="{{ public_form.descricao.id_for_label }}">Descricao</label>
-            {{ public_form.descricao }}
-            {% for error in public_form.descricao.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            <label class="form-label" for="{{ documento_publico_form.descricao.id_for_label }}">Descricao</label>
+            {{ documento_publico_form.descricao }}
+            {% for error in documento_publico_form.descricao.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
           </div>
           <div class="mb-3">
-            <label class="form-label" for="{{ public_form.arquivo.id_for_label }}">Arquivo</label>
-            {{ public_form.arquivo }}
+            <label class="form-label" for="{{ documento_publico_form.arquivo.id_for_label }}">Arquivo</label>
+            {{ documento_publico_form.arquivo }}
             <div class="form-text">Aceita PDF, PNG, JPG, JPEG e WEBP ate 10 MB.</div>
-            {% for error in public_form.arquivo.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            {% for error in documento_publico_form.arquivo.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
           </div>
           <button type="submit" class="btn btn-primary w-100">Enviar arquivo</button>
         </form>

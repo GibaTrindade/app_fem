@@ -3,15 +3,28 @@ from decimal import Decimal
 
 from django.db import models
 
-from core.models import AreaInvestimento, Secretaria, StatusObra, StatusPTM, TimestampedModel, TipoFEM
+from core.models import (
+    AreaInvestimento,
+    Secretaria,
+    StatusAnaliseDocumentacao,
+    StatusObra,
+    StatusPTM,
+    TimestampedModel,
+    TipoFEM,
+)
 
 
-def generate_public_access_token():
+def gerar_codigo_acesso_publico():
     return secrets.token_urlsafe(24)
 
 
-def public_document_upload_to(instance, filename):
+def upload_documento_publico_ptm(instance, filename):
     return f"ptms/publico/{instance.ptm_id}/{filename}"
+
+
+# Compatibilidade com migracoes ja aplicadas.
+generate_public_access_token = gerar_codigo_acesso_publico
+public_document_upload_to = upload_documento_publico_ptm
 
 
 class PTM(TimestampedModel):
@@ -51,8 +64,14 @@ class PTM(TimestampedModel):
     area_investimento = models.ForeignKey(AreaInvestimento, on_delete=models.PROTECT, null=True, blank=True)
     conta_ptm = models.CharField(max_length=50, blank=True)
     descricao = models.TextField(blank=True)
-    public_access_token = models.CharField(max_length=64, unique=True, null=True, blank=True)
-    public_analysis_status = models.CharField(max_length=255, blank=True)
+    codigo_acesso_publico = models.CharField(max_length=64, unique=True, null=True, blank=True)
+    status_analise_documentacao = models.ForeignKey(
+        StatusAnaliseDocumentacao,
+        on_delete=models.PROTECT,
+        related_name="ptms_status_analise_documentacao",
+        null=True,
+        blank=True,
+    )
 
     populacao_beneficiada = models.PositiveIntegerField(null=True, blank=True)
 
@@ -62,22 +81,22 @@ class PTM(TimestampedModel):
     def __str__(self):
         return f"{self.ordem} - {self.municipio}"
 
-    def ensure_public_access_token(self):
-        if self.public_access_token:
-            return self.public_access_token
-        token = generate_public_access_token()
-        while PTM.objects.filter(public_access_token=token).exists():
-            token = generate_public_access_token()
-        self.public_access_token = token
+    def garantir_codigo_acesso_publico(self):
+        if self.codigo_acesso_publico:
+            return self.codigo_acesso_publico
+        token = gerar_codigo_acesso_publico()
+        while PTM.objects.filter(codigo_acesso_publico=token).exists():
+            token = gerar_codigo_acesso_publico()
+        self.codigo_acesso_publico = token
         return token
 
 
-class PublicDocumentPTM(TimestampedModel):
+class DocumentoPublicoPTM(TimestampedModel):
     ptm = models.ForeignKey(PTM, on_delete=models.CASCADE, related_name="documentos_publicos")
     nome_remetente = models.CharField(max_length=150)
     contato = models.CharField(max_length=150, blank=True)
     descricao = models.TextField(blank=True)
-    arquivo = models.FileField(upload_to=public_document_upload_to)
+    arquivo = models.FileField(upload_to=upload_documento_publico_ptm)
 
     class Meta:
         ordering = ("-created_at",)

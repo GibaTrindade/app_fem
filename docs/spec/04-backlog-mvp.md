@@ -16,6 +16,13 @@
 2. Página detalhe PTM com abas de histórico.
 3. Painel resumo com métricas de repasse e andamento.
 
+## Fase 3.1 - Documentação Pública
+1. Gerar link público por PTM com código hash exclusivo.
+2. Criar página pública resumida para envio de documentação sem login.
+3. Registrar documentos enviados em modelo próprio vinculado ao PTM.
+4. Criar catálogo de status de análise da documentação.
+5. Exibir aba interna para analistas consultarem anexos e atualizarem o status da análise.
+
 ## Fase 4 - Importação de Dados
 1. Comando `manage.py import_fem_excel --file <path>`.
 2. Importação idempotente por `ORDEM`.

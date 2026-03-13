@@ -2,7 +2,16 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin
 
-from .models import AreaInvestimento, Municipio, Secretaria, StatusObra, StatusPTM, TipoFEM, UserMunicipio
+from .models import (
+    AreaInvestimento,
+    Municipio,
+    Secretaria,
+    StatusAnaliseDocumentacao,
+    StatusObra,
+    StatusPTM,
+    TipoFEM,
+    UserMunicipio,
+)
 
 User = get_user_model()
 
@@ -41,6 +50,13 @@ class StatusPTMAdmin(admin.ModelAdmin):
 
 @admin.register(StatusObra)
 class StatusObraAdmin(admin.ModelAdmin):
+    list_display = ("nome", "ativo")
+    search_fields = ("nome",)
+    list_filter = ("ativo",)
+
+
+@admin.register(StatusAnaliseDocumentacao)
+class StatusAnaliseDocumentacaoAdmin(admin.ModelAdmin):
     list_display = ("nome", "ativo")
     search_fields = ("nome",)
     list_filter = ("ativo",)

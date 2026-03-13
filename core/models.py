@@ -34,6 +34,10 @@ class StatusObra(NomeCatalogo):
     pass
 
 
+class StatusAnaliseDocumentacao(NomeCatalogo):
+    pass
+
+
 class AreaInvestimento(NomeCatalogo):
     pass
 

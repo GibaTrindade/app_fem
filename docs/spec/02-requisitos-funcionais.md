@@ -32,7 +32,15 @@ Substituir a operação da planilha por aplicação web Django com persistência
 7. Conclusão Informal
 - Registrar percentual declarado, contato e observação em múltiplos apontamentos.
 
-8. Resumo
+8. Documentação Pública do PTM
+- Gerar link público individual por PTM para compartilhamento externo.
+- Permitir acesso sem login a uma página resumida do PTM por código hash.
+- Permitir envio de arquivos PDF e imagens como documentação para análise.
+- Exibir, na área pública, o status atual da análise da documentação.
+- Exibir, na área interna do PTM, aba específica com os documentos enviados.
+- Permitir que analistas atualizem o status da análise por lista de catálogo.
+
+9. Resumo
 - Painel consolidado por PTM com principais indicadores e último andamento.
 
 ## Requisitos transversais

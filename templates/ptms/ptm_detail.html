@@ -541,6 +541,20 @@
           <p class="text-muted mb-0">Os analistas podem consultar aqui todos os anexos enviados pelo link publico do PTM.</p>
         </div>
       </div>
+      <div class="border rounded p-3 mb-3 bg-light">
+        <form method="post" action="{% url 'ptm_status_analise_update' ptm.pk %}">
+          {% csrf_token %}
+          <div class="row g-3 align-items-end">
+            <div class="col-12 col-md-8 col-lg-6">
+              <label class="form-label" for="{{ status_analise_form.status_analise_documentacao.id_for_label }}">Status da analise da documentacao</label>
+              {{ status_analise_form.status_analise_documentacao }}
+            </div>
+            <div class="col-12 col-md-auto">
+              <button type="submit" class="btn btn-primary">Salvar status</button>
+            </div>
+          </div>
+        </form>
+      </div>
       <div class="table-responsive">
         <table class="table table-striped table-hover">
           <thead class="table-light"><tr><th>Enviado em</th><th>Nome</th><th>Contato</th><th>Descricao</th><th class="text-end">Arquivo</th></tr></thead>

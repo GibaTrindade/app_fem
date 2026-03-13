@@ -18,16 +18,17 @@ from pagamentos.models import PagamentoPTM
 from prestacao_contas.models import PrestacaoContaHistorico, PrestacaoContaPTM
 from ptms.forms import (
     ConclusaoInformalForm,
+    DocumentoPublicoPTMForm,
     EventoPTMForm,
     ObservacaoEncaminhamentoForm,
     PagamentoPTMForm,
     PrestacaoContaHistoricoForm,
     PrestacaoContaPTMForm,
     PTMForm,
-    PublicDocumentPTMForm,
+    StatusAnaliseDocumentacaoForm,
     VistoriaPTMForm,
 )
-from ptms.models import PTM, PublicDocumentPTM
+from ptms.models import PTM
 from vistorias.models import VistoriaPTM
 
 
@@ -72,10 +73,10 @@ def _deny_edit_if_forbidden(request, ptm, tab="eventos"):
 
 
 def _public_ptm_url(request, ptm):
-    if not ptm.public_access_token:
+    if not ptm.codigo_acesso_publico:
         return ""
     return request.build_absolute_uri(
-        reverse("ptm_public_detail", kwargs={"token": ptm.public_access_token})
+        reverse("ptm_public_detail", kwargs={"token": ptm.codigo_acesso_publico})
     )
 
 
@@ -252,6 +253,9 @@ class PTMDetailView(DetailView):
         context["observacoes"] = ptm.observacoes_enc.all()
         context["conclusoes"] = ptm.conclusoes_informais.all()
         context["documentos_publicos"] = ptm.documentos_publicos.all()
+        context["status_analise_form"] = StatusAnaliseDocumentacaoForm(
+            initial={"status_analise_documentacao": ptm.status_analise_documentacao}
+        )
         context["can_edit_ptm"] = _user_can_edit_ptm(self.request.user, ptm)
         context["public_url"] = _public_ptm_url(self.request, ptm)
         return context
@@ -261,7 +265,7 @@ class PTMPublicDetailView(DetailView):
     model = PTM
     template_name = "ptms/ptm_public_detail.html"
     context_object_name = "ptm"
-    slug_field = "public_access_token"
+    slug_field = "codigo_acesso_publico"
     slug_url_kwarg = "token"
 
     def get_object(self, queryset=None):
@@ -269,24 +273,28 @@ class PTMPublicDetailView(DetailView):
         if not token:
             raise Http404
         return get_object_or_404(
-            PTM.objects.select_related("status_ptm_atual", "status_obra_atual"),
-            public_access_token=token,
+            PTM.objects.select_related(
+                "status_ptm_atual",
+                "status_obra_atual",
+                "status_analise_documentacao",
+            ),
+            codigo_acesso_publico=token,
         )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         ptm = self.object
-        context["public_form"] = kwargs.get("public_form") or PublicDocumentPTMForm()
+        context["documento_publico_form"] = kwargs.get("documento_publico_form") or DocumentoPublicoPTMForm()
         context["documentos_publicos"] = ptm.documentos_publicos.all()
         return context
 
 
 def ptm_public_upload(request, token):
-    ptm = get_object_or_404(PTM, public_access_token=token)
+    ptm = get_object_or_404(PTM, codigo_acesso_publico=token)
     if request.method != "POST":
         return redirect("ptm_public_detail", token=token)
 
-    form = PublicDocumentPTMForm(request.POST, request.FILES)
+    form = DocumentoPublicoPTMForm(request.POST, request.FILES)
     if form.is_valid():
         documento = form.save(commit=False)
         documento.ptm = ptm
@@ -299,7 +307,7 @@ def ptm_public_upload(request, token):
         "ptms/ptm_public_detail.html",
         {
             "ptm": ptm,
-            "public_form": form,
+            "documento_publico_form": form,
             "documentos_publicos": ptm.documentos_publicos.all(),
         },
     )
@@ -311,10 +319,26 @@ def ptm_generate_public_link(request, pk):
     if blocked:
         return blocked
     if request.method == "POST":
-        ptm.ensure_public_access_token()
-        ptm.save(update_fields=["public_access_token"])
+        ptm.garantir_codigo_acesso_publico()
+        ptm.save(update_fields=["codigo_acesso_publico"])
         messages.success(request, "Link publico gerado com sucesso.")
     return redirect(f"{reverse('ptm_detail', kwargs={'pk': ptm.pk})}?tab={request.GET.get('tab', 'eventos')}")
+
+
+def ptm_status_analise_update(request, pk):
+    ptm = get_object_or_404(PTM, pk=pk)
+    blocked = _deny_edit_if_forbidden(request, ptm, tab="documentos_publicos")
+    if blocked:
+        return blocked
+    if request.method == "POST":
+        form = StatusAnaliseDocumentacaoForm(request.POST)
+        if form.is_valid():
+            ptm.status_analise_documentacao = form.cleaned_data["status_analise_documentacao"]
+            ptm.save(update_fields=["status_analise_documentacao"])
+            messages.success(request, "Status da analise da documentacao atualizado com sucesso.")
+        else:
+            messages.error(request, "Nao foi possivel atualizar o status da analise da documentacao.")
+    return redirect(f"{reverse('ptm_detail', kwargs={'pk': ptm.pk})}?tab=documentos_publicos")
 
 
 class PTMCreateView(CreateView):

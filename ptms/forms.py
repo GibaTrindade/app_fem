@@ -3,11 +3,12 @@ from decimal import Decimal, InvalidOperation
 from django import forms
 
 from conclusao_informal.models import ConclusaoInformalPTM
+from core.models import StatusAnaliseDocumentacao
 from eventos.models import EventoPTM
 from observacoes.models import ObservacaoEncaminhamentoPTM
 from pagamentos.models import PagamentoPTM
 from prestacao_contas.models import PrestacaoContaHistorico, PrestacaoContaPTM
-from ptms.models import PTM, PublicDocumentPTM
+from ptms.models import DocumentoPublicoPTM, PTM
 from vistorias.models import VistoriaPTM
 
 
@@ -57,7 +58,7 @@ class PTMForm(BaseBootstrapModelForm):
             "area_investimento",
             "conta_ptm",
             "descricao",
-            "public_analysis_status",
+            "status_analise_documentacao",
             "populacao_beneficiada",
         ]
         widgets = {
@@ -66,20 +67,33 @@ class PTMForm(BaseBootstrapModelForm):
         }
 
 
-class PublicDocumentPTMForm(BaseBootstrapModelForm):
+class DocumentoPublicoPTMForm(BaseBootstrapModelForm):
     class Meta:
-        model = PublicDocumentPTM
+        model = DocumentoPublicoPTM
         fields = ["nome_remetente", "contato", "descricao", "arquivo"]
 
     def clean_arquivo(self):
         arquivo = self.cleaned_data["arquivo"]
         nome = arquivo.name.lower()
-        allowed_extensions = (".pdf", ".png", ".jpg", ".jpeg", ".webp")
-        if not nome.endswith(allowed_extensions):
+        extensoes_permitidas = (".pdf", ".png", ".jpg", ".jpeg", ".webp")
+        if not nome.endswith(extensoes_permitidas):
             raise forms.ValidationError("Envie um arquivo PDF ou imagem (PNG, JPG ou WEBP).")
         if arquivo.size > 10 * 1024 * 1024:
             raise forms.ValidationError("O arquivo deve ter no maximo 10 MB.")
         return arquivo
+
+
+class StatusAnaliseDocumentacaoForm(forms.Form):
+    status_analise_documentacao = forms.ModelChoiceField(
+        queryset=StatusAnaliseDocumentacao.objects.filter(ativo=True).order_by("nome"),
+        required=False,
+        empty_label="Selecione um status",
+        label="Status da analise da documentacao",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["status_analise_documentacao"].widget.attrs["class"] = "form-select"
 
 
 class EventoPTMForm(BaseBootstrapModelForm):
