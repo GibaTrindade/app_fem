@@ -1,11 +1,8 @@
 import os
-<<<<<<< HEAD
-from pathlib import Path
 
-from dotenv import load_dotenv
+from fem_control.env import BASE_DIR, load_environment
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / '.env')
+load_environment()
 
 
 def env_bool(name, default=False):
@@ -13,15 +10,6 @@ def env_bool(name, default=False):
     if value is None:
         return default
     return value.strip().lower() in {'1', 'true', 't', 'yes', 'y', 'on'}
-
-
-=======
-
-from fem_control.env import BASE_DIR, load_environment
-
-load_environment()
-
->>>>>>> 35ac44a4f5dda7755f4d7c7f49ff8f58b627ada1
 SECRET_KEY = 'django-insecure-8om%l#nx^dz1xzuiu733!sls-33hst-w5rp6jg-oodkn&u4hch'
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 ALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', '*').split(',') if host.strip()]
