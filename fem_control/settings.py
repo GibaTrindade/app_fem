@@ -13,6 +13,11 @@ def env_bool(name, default=False):
 SECRET_KEY = 'django-insecure-8om%l#nx^dz1xzuiu733!sls-33hst-w5rp6jg-oodkn&u4hch'
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 ALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', '*').split(',') if host.strip()]
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',')
+    if origin.strip()
+]
 
 INSTALLED_APPS = [
     'jazzmin',
@@ -107,3 +112,15 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/login/'
+
+if env_bool('USE_X_FORWARDED_HOST', False):
+    USE_X_FORWARDED_HOST = True
+
+if env_bool('USE_X_FORWARDED_PORT', False):
+    USE_X_FORWARDED_PORT = True
+
+if env_bool('SECURE_PROXY_SSL_HEADER_ENABLED', True):
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+SESSION_COOKIE_SECURE = env_bool('SESSION_COOKIE_SECURE', not DEBUG)
+CSRF_COOKIE_SECURE = env_bool('CSRF_COOKIE_SECURE', not DEBUG)
