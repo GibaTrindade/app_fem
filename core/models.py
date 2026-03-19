@@ -50,6 +50,14 @@ class Municipio(NomeCatalogo):
     pass
 
 
+class TermoAdesaoObservacao(NomeCatalogo):
+    pass
+
+
+class TermoAdesaoResponsavel(NomeCatalogo):
+    pass
+
+
 class UserMunicipio(TimestampedModel):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,

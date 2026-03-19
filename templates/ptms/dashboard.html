@@ -101,7 +101,14 @@
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-2">
           <h2 class="h6 mb-0">Maior saldo a receber</h2>
-          <span class="badge text-bg-primary">{{ kpi_sem_vistoria }} sem vistoria</span>
+          <button
+            type="button"
+            class="badge text-bg-primary border-0"
+            data-bs-toggle="modal"
+            data-bs-target="#semVistoriaModal"
+          >
+            {{ kpi_sem_vistoria }} sem vistoria
+          </button>
         </div>
         <div class="small text-muted mb-3">PTMs com maior diferenca entre teto FEM e total pago.</div>
         <ul class="list-group list-group-flush">
@@ -175,6 +182,33 @@
             </li>
           {% empty %}
             <li class="list-group-item px-0 text-muted">Sem dados de municipio.</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="semVistoriaModal" tabindex="-1" aria-labelledby="semVistoriaModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title h5 mb-0" id="semVistoriaModalLabel">PTMs sem vistoria</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+      </div>
+      <div class="modal-body">
+        <div class="small text-muted mb-3">Relacao completa dos PTMs incluidos no badge "sem vistoria".</div>
+        <ul class="list-group list-group-flush">
+          {% for ptm in sem_vistoria_ptms %}
+            <li class="list-group-item px-0 d-flex justify-content-between align-items-start gap-3">
+              <div>
+                <div class="fw-semibold">{{ ptm.ordem }} - {{ ptm.municipio }}</div>
+                <div class="small text-muted">{{ ptm.projeto|truncatechars:120 }}</div>
+              </div>
+              <a class="btn btn-sm btn-outline-primary flex-shrink-0" href="{% url 'ptm_detail' ptm.pk %}">Abrir PTM</a>
+            </li>
+          {% empty %}
+            <li class="list-group-item px-0 text-muted">Nenhum PTM sem vistoria.</li>
           {% endfor %}
         </ul>
       </div>

@@ -8,7 +8,8 @@ from eventos.models import EventoPTM
 from observacoes.models import ObservacaoEncaminhamentoPTM
 from pagamentos.models import PagamentoPTM
 from prestacao_contas.models import PrestacaoContaHistorico, PrestacaoContaPTM
-from ptms.models import DocumentoPublicoPTM, PTM
+from ptms.models import DocumentoPublicoPTM, NotaTecnicaPTM, PTM
+from ptms.models import TermoAdesaoPTM
 from vistorias.models import VistoriaPTM
 
 
@@ -96,6 +97,24 @@ class StatusAnaliseDocumentacaoForm(forms.Form):
         self.fields["status_analise_documentacao"].widget.attrs["class"] = "form-select"
 
 
+class NotaTecnicaMunicipioForm(forms.Form):
+    municipio = forms.ChoiceField(label="Municipio")
+
+    def __init__(self, *args, municipios=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        choices = [("", "Selecione um municipio")]
+        if municipios:
+            choices.extend((municipio, municipio.title()) for municipio in municipios)
+        self.fields["municipio"].choices = choices
+        self.fields["municipio"].widget.attrs["class"] = "form-select"
+
+
+class NotaTecnicaObservacaoForm(BaseBootstrapModelForm):
+    class Meta:
+        model = NotaTecnicaPTM
+        fields = ["observacao"]
+
+
 class EventoPTMForm(BaseBootstrapModelForm):
     class Meta:
         model = EventoPTM
@@ -161,6 +180,15 @@ class PrestacaoContaPTMForm(BaseBootstrapModelForm):
         widgets = {
             "prazo_contas": DateInput(),
             "data_prestacao": DateInput(),
+        }
+
+
+class TermoAdesaoPTMForm(BaseBootstrapModelForm):
+    class Meta:
+        model = TermoAdesaoPTM
+        fields = ["sei", "data", "responsavel", "observacao", "secretaria"]
+        widgets = {
+            "data": DateInput(),
         }
 
 

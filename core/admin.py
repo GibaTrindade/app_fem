@@ -9,6 +9,8 @@ from .models import (
     StatusAnaliseDocumentacao,
     StatusObra,
     StatusPTM,
+    TermoAdesaoObservacao,
+    TermoAdesaoResponsavel,
     TipoFEM,
     UserMunicipio,
 )
@@ -78,6 +80,20 @@ class SecretariaAdmin(admin.ModelAdmin):
 
 @admin.register(Municipio)
 class MunicipioAdmin(admin.ModelAdmin):
+    list_display = ("nome", "ativo")
+    search_fields = ("nome",)
+    list_filter = ("ativo",)
+
+
+@admin.register(TermoAdesaoObservacao)
+class TermoAdesaoObservacaoAdmin(admin.ModelAdmin):
+    list_display = ("nome", "ativo")
+    search_fields = ("nome",)
+    list_filter = ("ativo",)
+
+
+@admin.register(TermoAdesaoResponsavel)
+class TermoAdesaoResponsavelAdmin(admin.ModelAdmin):
     list_display = ("nome", "ativo")
     search_fields = ("nome",)
     list_filter = ("ativo",)

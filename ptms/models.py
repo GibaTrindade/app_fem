@@ -1,6 +1,7 @@
 import secrets
 from decimal import Decimal
 
+from django.conf import settings
 from django.db import models
 
 from core.models import (
@@ -9,6 +10,8 @@ from core.models import (
     StatusAnaliseDocumentacao,
     StatusObra,
     StatusPTM,
+    TermoAdesaoObservacao,
+    TermoAdesaoResponsavel,
     TimestampedModel,
     TipoFEM,
 )
@@ -105,3 +108,52 @@ class DocumentoPublicoPTM(TimestampedModel):
 
     def __str__(self):
         return f"{self.ptm.ordem} - {self.nome_remetente}"
+
+
+class NotaTecnicaPTM(TimestampedModel):
+    ptm = models.OneToOneField(PTM, on_delete=models.CASCADE, related_name="nota_tecnica")
+    observacao = models.TextField(blank=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="notas_tecnicas_ptm_atualizadas",
+    )
+
+    class Meta:
+        ordering = ("ptm__ordem",)
+        verbose_name = "Nota Tecnica do PTM"
+        verbose_name_plural = "Notas Tecnicas dos PTMs"
+
+    def __str__(self):
+        return f"{self.ptm.ordem} - Nota Tecnica"
+
+
+class TermoAdesaoPTM(TimestampedModel):
+    ptm = models.OneToOneField(PTM, on_delete=models.CASCADE, related_name="termo_adesao_registro")
+    sei = models.CharField(max_length=120, blank=True)
+    data = models.DateField(null=True, blank=True)
+    responsavel = models.ForeignKey(
+        TermoAdesaoResponsavel,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="termos_adesao",
+    )
+    observacao = models.ForeignKey(
+        TermoAdesaoObservacao,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="termos_adesao",
+    )
+    secretaria = models.CharField(max_length=150, blank=True)
+
+    class Meta:
+        ordering = ("ptm__ordem",)
+        verbose_name = "Termo de Adesao do PTM"
+        verbose_name_plural = "Termos de Adesao dos PTMs"
+
+    def __str__(self):
+        return f"{self.ptm.ordem} - Termo de Adesao"

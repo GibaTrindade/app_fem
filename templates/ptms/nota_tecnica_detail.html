@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}Nota Tecnica | {{ municipio }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .nota-shell {
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    border: 1px solid #d9e4f1;
+    border-radius: 24px;
+    box-shadow: 0 24px 60px rgba(12, 60, 96, 0.08);
+  }
+  .nota-topline {
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-size: 0.78rem;
+    color: #5f7285;
+  }
+  .nota-section + .nota-section {
+    border-top: 1px solid #e3ebf3;
+  }
+  .nota-table thead th {
+    background: #0c3c60;
+    color: #fff;
+    border-color: #0c3c60;
+    font-size: 0.82rem;
+  }
+  .nota-table textarea {
+    min-width: 280px;
+    min-height: 120px;
+    resize: vertical;
+  }
+  .nota-empty {
+    border: 1px dashed #c9d7e6;
+    border-radius: 16px;
+    background: #f8fbff;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+  <div>
+    <div class="nota-topline mb-2">Notas Tecnicas</div>
+    <h1 class="h3 mb-1">Municipio de {{ municipio|title }}</h1>
+    <div class="text-muted">Atualizado em {{ updated_today|date:"d/m/Y" }}</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'nota_tecnica_select' %}" class="btn btn-outline-secondary">Trocar municipio</a>
+    <button type="submit" form="nota-tecnica-form" class="btn btn-primary">Salvar observacoes</button>
+  </div>
+</div>
+
+<form method="post" id="nota-tecnica-form">
+  {% csrf_token %}
+  <div class="nota-shell p-4 p-lg-5">
+    <div class="mb-4">
+      <div class="nota-topline mb-2">Documento de acompanhamento</div>
+      <h2 class="h4 mb-0">Nota tecnica consolidada do municipio</h2>
+    </div>
+
+    {% for section in sections %}
+      <section class="nota-section py-4">
+        <h3 class="h5 mb-3">{{ section.titulo }}</h3>
+        <p class="text-muted mb-4">{{ section.texto_abertura }}</p>
+
+        {% if section.items %}
+          <div class="table-responsive">
+            <table class="table table-bordered align-middle nota-table">
+              <thead>
+                <tr>
+                  <th style="min-width: 300px;">PTM</th>
+                  <th style="min-width: 150px;">{{ section.coluna_valor }}</th>
+                  <th style="min-width: 150px;">VALOR REPASSADO</th>
+                  <th style="min-width: 165px;">DATA ULTIMO PAGAMENTO</th>
+                  <th style="min-width: 140px;">STATUS</th>
+                  <th style="min-width: 320px;">OBSERVACAO</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in section.items %}
+                  <tr>
+                    <td>
+                      <div class="fw-semibold">{{ item.ptm.projeto }}</div>
+                      <div class="small text-muted mt-1">{{ item.ptm.ordem }}</div>
+                    </td>
+                    <td>R$ {{ item.valor_total|floatformat:"2g" }}</td>
+                    <td>R$ {{ item.valor_repassado|floatformat:"2g" }}</td>
+                    <td>{{ item.data_ultimo_pagamento|date:"d/m/Y"|default:"-" }}</td>
+                    <td>{{ item.status|default:"-" }}</td>
+                    <td>
+                      <textarea class="form-control" name="obs_{{ item.ptm.id }}" placeholder="Digite a observacao da nota tecnica para este PTM">{{ item.observacao }}</textarea>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot>
+                <tr class="table-light">
+                  <th>TOTAL</th>
+                  <th>R$ {{ section.total_fem|floatformat:"2g" }}</th>
+                  <th>R$ {{ section.total_repassado|floatformat:"2g" }}</th>
+                  <th colspan="3"></th>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        {% else %}
+          <div class="nota-empty p-4 text-muted">
+            Este bloco ainda nao possui PTMs importados para {{ municipio|title }}.
+          </div>
+        {% endif %}
+      </section>
+    {% endfor %}
+  </div>
+</form>
+{% endblock %}

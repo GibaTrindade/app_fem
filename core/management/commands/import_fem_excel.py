@@ -10,15 +10,25 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
+from openpyxl.utils.datetime import from_excel
 from openpyxl.worksheet.worksheet import Worksheet
 
 from conclusao_informal.models import ConclusaoInformalPTM
-from core.models import AreaInvestimento, Municipio, Secretaria, StatusObra, StatusPTM, TipoFEM
+from core.models import (
+    AreaInvestimento,
+    Municipio,
+    Secretaria,
+    StatusObra,
+    StatusPTM,
+    TermoAdesaoObservacao,
+    TermoAdesaoResponsavel,
+    TipoFEM,
+)
 from eventos.models import EventoPTM
 from observacoes.models import ObservacaoEncaminhamentoPTM
 from pagamentos.models import PagamentoPTM
 from prestacao_contas.models import PrestacaoContaHistorico, PrestacaoContaPTM
-from ptms.models import PTM
+from ptms.models import PTM, TermoAdesaoPTM
 from vistorias.models import VistoriaPTM
 
 
@@ -35,10 +45,22 @@ def _sheet_by_name(workbook, expected: str) -> Worksheet:
     raise CommandError(f"Aba '{expected}' nao encontrada no arquivo.")
 
 
+def _optional_sheet_by_name(workbook, expected: str) -> Worksheet | None:
+    expected_norm = _norm(expected)
+    for ws in workbook.worksheets:
+        if _norm(ws.title) == expected_norm:
+            return ws
+    return None
+
+
 def _to_str(value) -> str:
     if value is None:
         return ""
     return str(value).strip()
+
+
+def _to_str_limited(value, max_length: int) -> str:
+    return _to_str(value)[:max_length]
 
 
 def _to_date(value) -> date | None:
@@ -48,6 +70,15 @@ def _to_date(value) -> date | None:
         return value.date()
     if isinstance(value, date):
         return value
+    if isinstance(value, (int, float)):
+        try:
+            converted = from_excel(value)
+            if isinstance(converted, datetime):
+                return converted.date()
+            if isinstance(converted, date):
+                return converted
+        except (OverflowError, ValueError, TypeError):
+            return None
     return None
 
 
@@ -83,6 +114,15 @@ def _iter_ptm_rows(ws: Worksheet):
             yield row, ordem
 
 
+def _find_header_column(ws: Worksheet, expected_header: str, header_row: int = 1) -> str | None:
+    expected_norm = _norm(expected_header)
+    for col in range(1, ws.max_column + 1):
+        value = ws.cell(row=header_row, column=col).value
+        if value and _norm(str(value)) == expected_norm:
+            return get_column_letter(col)
+    return None
+
+
 def _get_or_create_nome(model, value: str):
     value = _to_str(value)
     if not value:
@@ -109,6 +149,7 @@ class Counters:
     prestacao_historico: int = 0
     observacoes: int = 0
     conclusoes: int = 0
+    termos_adesao: int = 0
 
 
 class Command(BaseCommand):
@@ -140,10 +181,11 @@ class Command(BaseCommand):
         only_events = options["only_events"]
 
         wb = load_workbook(file_path, data_only=True, keep_vba=True)
-        ws_apoio = _sheet_by_name(wb, "APOIO")
+        ws_apoio = _optional_sheet_by_name(wb, "APOIO")
         ws_inf = _sheet_by_name(wb, "INF GERAIS")
         ws_eventos = _sheet_by_name(wb, "EVENTOS")
         if not skip_related and not only_events:
+            ws_termo_adesao = _sheet_by_name(wb, "TERMO DE ADESÃO")
             ws_pagamentos = _sheet_by_name(wb, "PAGAMENTOS")
             ws_vistorias = _sheet_by_name(wb, "VISTORIA")
             ws_prestacao = _sheet_by_name(wb, "PRESTACAO DE CONTAS")
@@ -151,7 +193,7 @@ class Command(BaseCommand):
             ws_conclusao = _sheet_by_name(wb, "CONCLUSAO INFORMAL")
 
         counters = Counters()
-        self._seed_catalogs(ws_apoio)
+        self._seed_catalogs(ws_apoio, ws_inf)
 
         processed = 0
         for row, ordem in _iter_ptm_rows(ws_inf):
@@ -172,6 +214,7 @@ class Command(BaseCommand):
                         counters.ptms_updated += 1
 
                     if not skip_related:
+                        TermoAdesaoPTM.objects.filter(ptm=ptm).delete()
                         ptm.eventos.all().delete()
                         ptm.pagamentos.all().delete()
                         ptm.vistorias.all().delete()
@@ -180,6 +223,7 @@ class Command(BaseCommand):
                         PrestacaoContaPTM.objects.filter(ptm=ptm).delete()
 
                         counters.eventos += self._import_eventos(ws_eventos, row, ptm)
+                        counters.termos_adesao += self._import_termo_adesao(ws_termo_adesao, row, ptm)
                         counters.pagamentos += self._import_pagamentos(ws_pagamentos, row, ptm)
                         counters.vistorias += self._import_vistorias(ws_vistorias, row, ptm)
                         p_count, ph_count = self._import_prestacao(ws_prestacao, row, ptm)
@@ -202,15 +246,25 @@ class Command(BaseCommand):
         else:
             self.stdout.write(
                 "Registros: "
-                f"eventos={counters.eventos}, pagamentos={counters.pagamentos}, "
+                f"eventos={counters.eventos}, termos_adesao={counters.termos_adesao}, pagamentos={counters.pagamentos}, "
                 f"vistorias={counters.vistorias}, prestacoes={counters.prestacoes}, "
                 f"prestacao_historico={counters.prestacao_historico}, "
                 f"obs_enc={counters.observacoes}, conclusoes={counters.conclusoes}"
             )
 
-    def _seed_catalogs(self, ws_apoio: Worksheet):
+    def _seed_catalogs(self, ws_apoio: Worksheet | None, ws_inf: Worksheet):
         for value in ("NORMAL", "MULHER", "EMENDA"):
             TipoFEM.objects.get_or_create(nome=value)
+
+        for row, _ in _iter_ptm_rows(ws_inf):
+            _get_or_create_nome(Municipio, ws_inf[f"C{row}"].value)
+            _get_or_create_nome(StatusPTM, ws_inf[f"M{row}"].value)
+            _get_or_create_nome(StatusObra, ws_inf[f"N{row}"].value)
+            _get_or_create_nome(Secretaria, ws_inf[f"Q{row}"].value)
+            _get_or_create_nome(AreaInvestimento, ws_inf[f"S{row}"].value)
+
+        if ws_apoio is None:
+            return
 
         for row in range(3, ws_apoio.max_row + 1):
             _get_or_create_nome(StatusPTM, ws_apoio[f"B{row}"].value)
@@ -223,7 +277,6 @@ class Command(BaseCommand):
         status_obra = _get_or_create_nome(StatusObra, ws_inf[f"N{row}"].value)
         area = _get_or_create_nome(AreaInvestimento, ws_inf[f"S{row}"].value)
         secretaria = _get_or_create_nome(Secretaria, ws_inf[f"Q{row}"].value)
-
         defaults = {
             "regiao": _to_str(ws_inf[f"B{row}"].value),
             "municipio": _to_str(ws_inf[f"C{row}"].value),
@@ -242,7 +295,7 @@ class Command(BaseCommand):
             "ressalva": _to_str(ws_inf[f"P{row}"].value),
             "secretaria": secretaria,
             "area_investimento": area,
-            "conta_ptm": _to_str(ws_inf[f"T{row}"].value),
+            "conta_ptm": _to_str_limited(ws_inf[f"T{row}"].value, 50),
             "descricao": _to_str(ws_inf[f"AI{row}"].value),
             "populacao_beneficiada": int(ws_inf[f"U{row}"].value)
             if isinstance(ws_inf[f"U{row}"].value, (int, float))
@@ -288,13 +341,31 @@ class Command(BaseCommand):
             ptm.save(update_fields=["status_ptm_atual", "status_obra_atual", "updated_at"])
         return len(to_create)
 
+    def _import_termo_adesao(self, ws: Worksheet, row: int, ptm: PTM) -> int:
+        sei = _to_str(ws[f"E{row}"].value)
+        data = _to_date(ws[f"F{row}"].value)
+        responsavel = _get_or_create_nome(TermoAdesaoResponsavel, ws[f"G{row}"].value)
+        observacao = _get_or_create_nome(TermoAdesaoObservacao, ws[f"H{row}"].value)
+        secretaria = _to_str(ws[f"I{row}"].value)
+        if not any([sei, data, responsavel, observacao]):
+            return 0
+        TermoAdesaoPTM.objects.create(
+            ptm=ptm,
+            sei=sei,
+            data=data,
+            responsavel=responsavel,
+            observacao=observacao,
+            secretaria=secretaria,
+        )
+        return 1
+
     def _import_pagamentos(self, ws: Worksheet, row: int, ptm: PTM) -> int:
         created = 0
         normal_blocks = [
-            ("1", "I", "J", "K", "L", "M", "N", "O", "P"),
-            ("2", "Q", "R", "S", "T", "U", "V", "W", "X"),
-            ("3", "Y", "Z", "AA", "AB", "AC", "AD", "AE", "AF"),
-            ("4", "AG", "AH", "AI", "AJ", "AK", "AL", "AM", "AN"),
+            ("1", "H", "I", "J", "K", "L", "M", "N", "O"),
+            ("2", "P", "Q", "R", "S", "T", "U", "V", "W"),
+            ("3", "X", "Y", "Z", "AA", "AB", "AC", "AD", "AE"),
+            ("4", "AF", "AG", "AH", "AI", "AJ", "AK", "AL", "AM"),
         ]
         for parcela, c_sol, c_env, c_prev, c_real, c_pg, c_ob, c_emp, c_obs in normal_blocks:
             valor_real = ws[f"{c_real}{row}"].value
@@ -309,15 +380,15 @@ class Command(BaseCommand):
                 dt_pagamento=_to_date(ws[f"{c_pg}{row}"].value),
                 valor_previsto=_to_decimal(ws[f"{c_prev}{row}"].value),
                 valor_realizado=_to_decimal(valor_real),
-                numero_ob=_to_str(ws[f"{c_ob}{row}"].value),
-                numero_empenho=_to_str(ws[f"{c_emp}{row}"].value),
+                numero_ob=_to_str_limited(ws[f"{c_ob}{row}"].value, 50),
+                numero_empenho=_to_str_limited(ws[f"{c_emp}{row}"].value, 50),
                 observacao=_to_str(ws[f"{c_obs}{row}"].value),
             )
             created += 1
 
         extra_blocks = [
-            ("AO", "AP", "AQ", "AR", "AS", "AT"),
-            ("AU", "AV", "AW", "AX", "AY", "AZ"),
+            ("AN", "AO", "AP", "AQ", "AR", "AS"),
+            ("AT", "AU", "AV", "AW", "AX", "AY"),
         ]
         for c_parcela, c_real, c_pg, c_ob, c_emp, c_obs in extra_blocks:
             parcela_raw = _to_str(ws[f"{c_parcela}{row}"].value)
@@ -332,8 +403,8 @@ class Command(BaseCommand):
                 tipo_registro="extra",
                 dt_pagamento=_to_date(ws[f"{c_pg}{row}"].value),
                 valor_realizado=_to_decimal(ws[f"{c_real}{row}"].value),
-                numero_ob=_to_str(ws[f"{c_ob}{row}"].value),
-                numero_empenho=_to_str(ws[f"{c_emp}{row}"].value),
+                numero_ob=_to_str_limited(ws[f"{c_ob}{row}"].value, 50),
+                numero_empenho=_to_str_limited(ws[f"{c_emp}{row}"].value, 50),
                 observacao=_to_str(ws[f"{c_obs}{row}"].value),
             )
             created += 1
@@ -367,21 +438,13 @@ class Command(BaseCommand):
 
     def _import_prestacao(self, ws: Worksheet, row: int, ptm: PTM) -> tuple[int, int]:
         base_has_data = any(
-            ws[f"{col}{row}"].value not in (None, "") for col in ("G", "H", "I")
+            ws[f"{col}{row}"].value not in (None, "") for col in ("F", "G", "H")
         )
-        hist_pairs = [
-            ("J", "K"),
-            ("L", "M"),
-            ("N", "O"),
-            ("P", "Q"),
-            ("R", "S"),
-            ("T", "U"),
-            ("V", "W"),
-            ("X", "Y"),
-            ("Z", "AA"),
-            ("AB", "AC"),
-            ("AD", "AE"),
-        ]
+        hist_pairs: list[tuple[str, str]] = []
+        col = 9  # I
+        while col + 1 <= ws.max_column:
+            hist_pairs.append((get_column_letter(col), get_column_letter(col + 1)))
+            col += 2
         hist_count = 0
 
         if not base_has_data and not any(
@@ -391,9 +454,9 @@ class Command(BaseCommand):
 
         prestacao = PrestacaoContaPTM.objects.create(
             ptm=ptm,
-            prazo_contas=_to_date(ws[f"G{row}"].value),
-            data_prestacao=_to_date(ws[f"H{row}"].value),
-            situacao=_to_str(ws[f"I{row}"].value),
+            prazo_contas=_to_date(ws[f"F{row}"].value),
+            data_prestacao=_to_date(ws[f"G{row}"].value),
+            situacao=_to_str(ws[f"H{row}"].value),
         )
         for obs_col, data_col in hist_pairs:
             obs = _to_str(ws[f"{obs_col}{row}"].value)
@@ -409,7 +472,7 @@ class Command(BaseCommand):
 
     def _import_observacoes(self, ws: Worksheet, row: int, ptm: PTM) -> int:
         created = 0
-        col = 7  # G
+        col = 6  # F
         while col + 1 <= ws.max_column:
             obs = _to_str(ws.cell(row=row, column=col).value)
             data_registro = _to_date(ws.cell(row=row, column=col + 1).value)
@@ -426,9 +489,9 @@ class Command(BaseCommand):
     def _import_conclusoes(self, ws: Worksheet, row: int, ptm: PTM) -> int:
         created = 0
         blocks = [
-            ("G", "H", "I", "J"),
-            ("K", "L", "M", "N"),
-            ("O", "P", "Q", "R"),
+            ("F", "G", "H", "I"),
+            ("J", "K", "L", "M"),
+            ("N", "O", "P", "Q"),
         ]
         for c_pct, c_data, c_contato, c_obs in blocks:
             pct = ws[f"{c_pct}{row}"].value

@@ -20,6 +20,9 @@
             {% if ptm.area_investimento %} • {{ ptm.area_investimento }}{% endif %}
             {% if ptm.tipo_fem %} • {{ ptm.tipo_fem }}{% endif %}
           </p>
+          {% if ptm.ressalva %}
+            <p class="text-muted small mb-0 mt-1">SEI: {{ ptm.ressalva }}</p>
+          {% endif %}
         </div>
         <div class="d-flex gap-2 flex-wrap justify-content-end">
           <button
@@ -181,7 +184,9 @@
   <div class="card-body">
     <ul class="nav nav-pills gap-2">
       <li class="nav-item"><a class="nav-link {% if tab == 'eventos' %}active{% endif %}" href="?tab=eventos">Eventos</a></li>
+      <li class="nav-item"><a class="nav-link {% if tab == 'termo_adesao' %}active{% endif %}" href="?tab=termo_adesao">Termo de Adesao</a></li>
       <li class="nav-item"><a class="nav-link {% if tab == 'pagamentos' %}active{% endif %}" href="?tab=pagamentos">Pagamentos</a></li>
+      <li class="nav-item"><a class="nav-link {% if tab == 'resumo_financeiro' %}active{% endif %}" href="?tab=resumo_financeiro">Resumo Financeiro</a></li>
       <li class="nav-item"><a class="nav-link {% if tab == 'vistorias' %}active{% endif %}" href="?tab=vistorias">Vistorias</a></li>
       <li class="nav-item"><a class="nav-link {% if tab == 'prestacao' %}active{% endif %}" href="?tab=prestacao">Prestacao de Contas</a></li>
       <li class="nav-item"><a class="nav-link {% if tab == 'observacoes' %}active{% endif %}" href="?tab=observacoes">Obs/Enc</a></li>
@@ -247,6 +252,65 @@
           </tbody>
         </table>
       </div>
+    {% elif tab == 'termo_adesao' %}
+      <div class="d-flex gap-2 mb-3 flex-wrap">
+        {% if can_edit_ptm %}
+          <button
+            type="button"
+            class="btn btn-primary"
+            data-bs-toggle="modal"
+            data-bs-target="#editTermoAdesaoModal"
+            data-sei="{{ termo_adesao.sei|default:'' }}"
+            data-data="{{ termo_adesao.data|date:'Y-m-d' }}"
+            data-responsavel="{{ termo_adesao.responsavel_id|default:'' }}"
+            data-observacao="{{ termo_adesao.observacao_id|default:'' }}"
+            data-secretaria="{{ termo_adesao.secretaria|default:'' }}"
+          >
+            {{ termo_adesao|yesno:"Editar Termo de Adesao,Adicionar Termo de Adesao" }}
+          </button>
+          {% if termo_adesao %}
+            <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteTermoAdesaoModal">
+              Excluir Termo de Adesao
+            </button>
+          {% endif %}
+        {% endif %}
+      </div>
+      {% if termo_adesao %}
+        <div class="row g-3">
+          <div class="col-12 col-md-6 col-xl-3">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="small text-muted mb-1">SEI</div>
+              <div class="fw-semibold">{{ termo_adesao.sei|default:"-" }}</div>
+            </div>
+          </div>
+          <div class="col-12 col-md-6 col-xl-3">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="small text-muted mb-1">Data</div>
+              <div class="fw-semibold">{{ termo_adesao.data|date:"d/m/Y"|default:"-" }}</div>
+            </div>
+          </div>
+          <div class="col-12 col-md-6 col-xl-3">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="small text-muted mb-1">Responsavel</div>
+              <div class="fw-semibold">{{ termo_adesao.responsavel.nome|default:"-" }}</div>
+            </div>
+          </div>
+          <div class="col-12 col-md-6 col-xl-3">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="small text-muted mb-1">Secretaria</div>
+              <div class="fw-semibold">{{ termo_adesao.secretaria|default:"-" }}</div>
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="border rounded p-3">
+              <div class="small text-muted mb-1">Observacao</div>
+              <div style="white-space: pre-wrap;">{{ termo_adesao.observacao.nome|default:"-" }}</div>
+            </div>
+          </div>
+        </div>
+      {% else %}
+        <div class="text-muted">Nenhum termo de adesao informado para este PTM.</div>
+      {% endif %}
     {% elif tab == 'pagamentos' %}
       {% if can_edit_ptm %}
         <div class="mb-3">
@@ -308,6 +372,105 @@
           {% endfor %}
           </tbody>
         </table>
+      </div>
+    {% elif tab == 'resumo_financeiro' %}
+      <div class="row g-3 mb-3">
+        <div class="col-12 col-md-6 col-xl-3">
+          <div class="border rounded p-3 h-100 bg-light">
+            <div class="small text-muted mb-1">Data ultimo pagamento</div>
+            <div class="fw-semibold">
+              {% if resumo_financeiro.data_ultimo_pagamento %}
+                {{ resumo_financeiro.data_ultimo_pagamento|date:"d/m/Y" }}
+              {% else %}
+                SEM PAGAMENTO
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+          <div class="border rounded p-3 h-100 bg-light">
+            <div class="small text-muted mb-1">Parcela paga</div>
+            <div class="fw-semibold">{{ resumo_financeiro.parcela_paga }}</div>
+          </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+          <div class="border rounded p-3 h-100 bg-light">
+            <div class="small text-muted mb-1">R$ (ult. pag.)</div>
+            <div class="fw-semibold">
+              {% if resumo_financeiro.valor_ultimo_pagamento is not None %}
+                R$ {{ resumo_financeiro.valor_ultimo_pagamento|moeda_br }}
+              {% else %}
+                SEM PAGAMENTO
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+          <div class="border rounded p-3 h-100 bg-light">
+            <div class="small text-muted mb-1">% recebido</div>
+            <div class="fw-semibold">
+              {% if resumo_financeiro.percentual_recebido is not None %}
+                {{ resumo_financeiro.percentual_recebido|floatformat:2 }}%
+              {% else %}
+                NA
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-12 col-xl-8">
+          <div class="table-responsive">
+            <table class="table table-striped table-hover">
+              <tbody>
+                <tr>
+                  <th class="table-light" style="width: 260px;">Repasse total</th>
+                  <td>R$ {{ resumo_financeiro.repasse_total|moeda_br }}</td>
+                </tr>
+                <tr>
+                  <th class="table-light">Repasse valido</th>
+                  <td>R$ {{ resumo_financeiro.repasse_valido|moeda_br }}</td>
+                </tr>
+                <tr>
+                  <th class="table-light">Saldo a receber</th>
+                  <td>R$ {{ resumo_financeiro.saldo_a_receber|moeda_br }}</td>
+                </tr>
+                <tr>
+                  <th class="table-light">Parcela pendente</th>
+                  <td>{{ resumo_financeiro.parcela_pendente }}</td>
+                </tr>
+                <tr>
+                  <th class="table-light">Situacao</th>
+                  <td>{{ resumo_financeiro.situacao }}</td>
+                </tr>
+                <tr>
+                  <th class="table-light">Data</th>
+                  <td>
+                    {% if resumo_financeiro.data_referencia == "OK" %}
+                      OK
+                    {% elif resumo_financeiro.data_referencia %}
+                      {{ resumo_financeiro.data_referencia|date:"d/m/Y" }}
+                    {% else %}
+                      -
+                    {% endif %}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="col-12 col-xl-4">
+          <div class="border rounded p-3 h-100">
+            <div class="small text-muted mb-2">Leitura da planilha RESUMO</div>
+            <p class="mb-2">Este quadro reproduz a logica financeira da aba <strong>RESUMO</strong> da planilha original.</p>
+            <ul class="small text-muted mb-0">
+              <li>Ultimo pagamento considera a data mais recente entre parcelas normais e complementares.</li>
+              <li>Parcela pendente observa solicitacao/envio financeiro sem pagamento concluido.</li>
+              <li>Saldo e percentual usam o <strong>Recurso FEM</strong> como base.</li>
+            </ul>
+          </div>
+        </div>
       </div>
     {% elif tab == 'vistorias' %}
       {% if can_edit_ptm %}
@@ -976,6 +1139,77 @@
   </div>
 </div>
 
+<div class="modal fade" id="editTermoAdesaoModal" tabindex="-1" aria-labelledby="editTermoAdesaoLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'termo_adesao_upsert' ptm.pk %}" id="editTermoAdesaoForm">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="editTermoAdesaoLabel">Termo de Adesao</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="id_termo_adesao_sei" class="form-label">SEI</label>
+            <input type="text" class="form-control" name="sei" id="id_termo_adesao_sei">
+          </div>
+          <div class="mb-3">
+            <label for="id_termo_adesao_data" class="form-label">Data</label>
+            <input type="date" class="form-control" name="data" id="id_termo_adesao_data">
+          </div>
+          <div class="mb-3">
+            <label for="id_termo_adesao_responsavel" class="form-label">Responsavel</label>
+            <select class="form-select" name="responsavel" id="id_termo_adesao_responsavel">
+              <option value="">---------</option>
+              {% for item in termo_adesao_responsavel_options %}
+                <option value="{{ item.id }}">{{ item.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label for="id_termo_adesao_observacao" class="form-label">Observacao</label>
+            <select class="form-select" name="observacao" id="id_termo_adesao_observacao">
+              <option value="">---------</option>
+              {% for item in termo_adesao_observacao_options %}
+                <option value="{{ item.id }}">{{ item.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-0">
+            <label for="id_termo_adesao_secretaria" class="form-label">Secretaria</label>
+            <input type="text" class="form-control" name="secretaria" id="id_termo_adesao_secretaria">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="deleteTermoAdesaoModal" tabindex="-1" aria-labelledby="deleteTermoAdesaoLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'termo_adesao_delete' ptm.pk %}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="deleteTermoAdesaoLabel">Excluir Termo de Adesao</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-0">Confirma excluir o termo de adesao deste PTM?</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-danger">Excluir</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="deletePrestacaoModal" tabindex="-1" aria-labelledby="deletePrestacaoLabel" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -1336,6 +1570,18 @@
       document.getElementById("id_prestacao_prazo").value = button.getAttribute("data-prazo") || "";
       document.getElementById("id_prestacao_data").value = button.getAttribute("data-data-prestacao") || "";
       document.getElementById("id_prestacao_situacao").value = button.getAttribute("data-situacao") || "";
+    });
+  }
+
+  const editTermoAdesaoModal = document.getElementById("editTermoAdesaoModal");
+  if (editTermoAdesaoModal) {
+    editTermoAdesaoModal.addEventListener("show.bs.modal", function (event) {
+      const button = event.relatedTarget;
+      document.getElementById("id_termo_adesao_sei").value = button.getAttribute("data-sei") || "";
+      document.getElementById("id_termo_adesao_data").value = button.getAttribute("data-data") || "";
+      document.getElementById("id_termo_adesao_responsavel").value = button.getAttribute("data-responsavel") || "";
+      document.getElementById("id_termo_adesao_observacao").value = button.getAttribute("data-observacao") || "";
+      document.getElementById("id_termo_adesao_secretaria").value = button.getAttribute("data-secretaria") || "";
     });
   }
 

@@ -2,6 +2,7 @@
 
 from ptms.views import (
     DashboardView,
+    NotaTecnicaMunicipioListView,
     PTMCreateView,
     PTMDeleteView,
     PTMDetailView,
@@ -28,6 +29,9 @@ from ptms.views import (
     ptm_generate_public_link,
     ptm_status_analise_update,
     ptm_public_upload,
+    nota_tecnica_detail,
+    termo_adesao_delete,
+    termo_adesao_upsert,
     vistoria_delete,
     vistoria_create,
     vistoria_update,
@@ -36,6 +40,8 @@ from ptms.views import (
 urlpatterns = [
     path('', PTMListView.as_view(), name='ptm_list'),
     path('dashboard/', DashboardView.as_view(), name='dashboard'),
+    path('notas-tecnicas/', NotaTecnicaMunicipioListView.as_view(), name='nota_tecnica_select'),
+    path('notas-tecnicas/gerar/', nota_tecnica_detail, name='nota_tecnica_detail'),
     path('acesso/<slug:token>/', PTMPublicDetailView.as_view(), name='ptm_public_detail'),
     path('acesso/<slug:token>/upload/', ptm_public_upload, name='ptm_public_upload'),
     path('ptms/novo/', PTMCreateView.as_view(), name='ptm_create'),
@@ -48,6 +54,8 @@ urlpatterns = [
     path('ptms/<int:ptm_id>/eventos/novo/', evento_create, name='evento_create'),
     path('ptms/<int:ptm_id>/eventos/<int:evento_id>/editar/', evento_update, name='evento_update'),
     path('ptms/<int:ptm_id>/eventos/<int:evento_id>/excluir/', evento_delete, name='evento_delete'),
+    path('ptms/<int:ptm_id>/termo-adesao/editar/', termo_adesao_upsert, name='termo_adesao_upsert'),
+    path('ptms/<int:ptm_id>/termo-adesao/excluir/', termo_adesao_delete, name='termo_adesao_delete'),
     path('ptms/<int:ptm_id>/pagamentos/novo/', pagamento_create, name='pagamento_create'),
     path('ptms/<int:ptm_id>/pagamentos/<int:pagamento_id>/editar/', pagamento_update, name='pagamento_update'),
     path('ptms/<int:ptm_id>/pagamentos/<int:pagamento_id>/excluir/', pagamento_delete, name='pagamento_delete'),
