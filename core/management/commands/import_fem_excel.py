@@ -107,20 +107,65 @@ def _to_percentage(value) -> Decimal:
         return Decimal("0.0000")
 
 
-def _iter_ptm_rows(ws: Worksheet):
-    for row in range(2, ws.max_row + 1):
-        ordem = _to_str(ws[f"A{row}"].value)
+@dataclass(frozen=True)
+class SheetLayout:
+    header_row: int
+    first_data_row: int
+    first_col: int
+    has_ordem: bool = True
+
+
+def _column_index(letter: str) -> int:
+    result = 0
+    for ch in letter.upper():
+        result = result * 26 + (ord(ch) - ord("A") + 1)
+    return result - 1
+
+
+def _logical_column(layout: SheetLayout, letter: str) -> str:
+    return get_column_letter(layout.first_col + _column_index(letter))
+
+
+def _value(ws: Worksheet, layout: SheetLayout, row: int, letter: str):
+    if not layout.has_ordem:
+        if letter.upper() == "A":
+            return None
+        offset = _column_index(letter) - 1
+        return ws.cell(row=row, column=layout.first_col + offset).value
+    return ws[f"{_logical_column(layout, letter)}{row}"].value
+
+
+def _detect_layout(ws: Worksheet) -> SheetLayout:
+    for row in range(1, min(ws.max_row, 15) + 1):
+        for col in range(1, min(ws.max_column, 12) + 1):
+            value = ws.cell(row=row, column=col).value
+            if _norm(_to_str(value)) != "ordem":
+                continue
+            first_data_row = row + 1
+            while first_data_row <= ws.max_row and not _to_str(ws.cell(row=first_data_row, column=col).value):
+                first_data_row += 1
+            return SheetLayout(header_row=row, first_data_row=first_data_row, first_col=col, has_ordem=True)
+    for row in range(1, min(ws.max_row, 10) + 1):
+        header_1 = _norm(_to_str(ws.cell(row=row, column=1).value))
+        header_2 = _norm(_to_str(ws.cell(row=row, column=2).value))
+        header_3 = _norm(_to_str(ws.cell(row=row, column=3).value))
+        if header_1 in {"regiao", "rd"} and header_2 == "municipio" and header_3 == "projeto":
+            return SheetLayout(header_row=row, first_data_row=row + 1, first_col=1, has_ordem=False)
+    raise CommandError(f"Nao foi possivel localizar o cabecalho 'ORDEM' na aba '{ws.title}'.")
+
+
+def _iter_ptm_rows(ws: Worksheet, layout: SheetLayout, fallback_ordens: list[tuple[int, str]] | None = None):
+    if not layout.has_ordem:
+        if fallback_ordens is None:
+            raise CommandError(f"Aba '{ws.title}' sem coluna ORDEM e sem referencia auxiliar.")
+        for row, ordem in fallback_ordens:
+            if row >= layout.first_data_row:
+                yield row, ordem
+        return
+    for row in range(layout.first_data_row, ws.max_row + 1):
+        ordem = _to_str(_value(ws, layout, row, "A"))
         if ordem:
             yield row, ordem
-
-
-def _find_header_column(ws: Worksheet, expected_header: str, header_row: int = 1) -> str | None:
-    expected_norm = _norm(expected_header)
-    for col in range(1, ws.max_column + 1):
-        value = ws.cell(row=header_row, column=col).value
-        if value and _norm(str(value)) == expected_norm:
-            return get_column_letter(col)
-    return None
 
 
 def _get_or_create_nome(model, value: str):
@@ -184,6 +229,21 @@ class Command(BaseCommand):
         ws_apoio = _optional_sheet_by_name(wb, "APOIO")
         ws_inf = _sheet_by_name(wb, "INF GERAIS")
         ws_eventos = _sheet_by_name(wb, "EVENTOS")
+        layout_apoio = None
+        if ws_apoio is not None:
+            try:
+                layout_apoio = _detect_layout(ws_apoio)
+            except CommandError:
+                layout_apoio = None
+        layout_inf = _detect_layout(ws_inf)
+        layout_eventos = _detect_layout(ws_eventos)
+        row_pairs = list(
+            _iter_ptm_rows(
+                ws_inf,
+                layout_inf,
+                fallback_ordens=list(_iter_ptm_rows(ws_eventos, layout_eventos)) if not layout_inf.has_ordem else None,
+            )
+        )
         if not skip_related and not only_events:
             ws_termo_adesao = _sheet_by_name(wb, "TERMO DE ADESÃO")
             ws_pagamentos = _sheet_by_name(wb, "PAGAMENTOS")
@@ -191,23 +251,29 @@ class Command(BaseCommand):
             ws_prestacao = _sheet_by_name(wb, "PRESTACAO DE CONTAS")
             ws_obs = _sheet_by_name(wb, "OBS  ENC")
             ws_conclusao = _sheet_by_name(wb, "CONCLUSAO INFORMAL")
+            layout_termo_adesao = _detect_layout(ws_termo_adesao)
+            layout_pagamentos = _detect_layout(ws_pagamentos)
+            layout_vistorias = _detect_layout(ws_vistorias)
+            layout_prestacao = _detect_layout(ws_prestacao)
+            layout_obs = _detect_layout(ws_obs)
+            layout_conclusao = _detect_layout(ws_conclusao)
 
         counters = Counters()
-        self._seed_catalogs(ws_apoio, ws_inf)
+        self._seed_catalogs(ws_apoio, layout_apoio, ws_inf, layout_inf, row_pairs)
 
         processed = 0
-        for row, ordem in _iter_ptm_rows(ws_inf):
+        for row, ordem in row_pairs:
             if limit and processed >= limit:
                 break
             with transaction.atomic():
                 if only_events:
                     ptm = PTM.objects.filter(ordem=ordem).first()
                     if ptm is None:
-                        ptm, _ = self._upsert_ptm(ws_inf, row, ordem)
+                        ptm, _ = self._upsert_ptm(ws_inf, layout_inf, row, ordem)
                     ptm.eventos.all().delete()
-                    counters.eventos += self._import_eventos(ws_eventos, row, ptm)
+                    counters.eventos += self._import_eventos(ws_eventos, layout_eventos, row, ptm)
                 else:
-                    ptm, created = self._upsert_ptm(ws_inf, row, ordem)
+                    ptm, created = self._upsert_ptm(ws_inf, layout_inf, row, ordem)
                     if created:
                         counters.ptms_created += 1
                     else:
@@ -222,15 +288,25 @@ class Command(BaseCommand):
                         ptm.conclusoes_informais.all().delete()
                         PrestacaoContaPTM.objects.filter(ptm=ptm).delete()
 
-                        counters.eventos += self._import_eventos(ws_eventos, row, ptm)
-                        counters.termos_adesao += self._import_termo_adesao(ws_termo_adesao, row, ptm)
-                        counters.pagamentos += self._import_pagamentos(ws_pagamentos, row, ptm)
-                        counters.vistorias += self._import_vistorias(ws_vistorias, row, ptm)
-                        p_count, ph_count = self._import_prestacao(ws_prestacao, row, ptm)
+                        counters.eventos += self._import_eventos(ws_eventos, layout_eventos, row, ptm)
+                        counters.termos_adesao += self._import_termo_adesao(
+                            ws_termo_adesao, layout_termo_adesao, row, ptm
+                        )
+                        counters.pagamentos += self._import_pagamentos(
+                            ws_pagamentos, layout_pagamentos, row, ptm
+                        )
+                        counters.vistorias += self._import_vistorias(
+                            ws_vistorias, layout_vistorias, row, ptm
+                        )
+                        p_count, ph_count = self._import_prestacao(
+                            ws_prestacao, layout_prestacao, row, ptm
+                        )
                         counters.prestacoes += p_count
                         counters.prestacao_historico += ph_count
-                        counters.observacoes += self._import_observacoes(ws_obs, row, ptm)
-                        counters.conclusoes += self._import_conclusoes(ws_conclusao, row, ptm)
+                        counters.observacoes += self._import_observacoes(ws_obs, layout_obs, row, ptm)
+                        counters.conclusoes += self._import_conclusoes(
+                            ws_conclusao, layout_conclusao, row, ptm
+                        )
             processed += 1
             if processed % 25 == 0:
                 self.stdout.write(f"Processados {processed} PTMs...")
@@ -252,64 +328,71 @@ class Command(BaseCommand):
                 f"obs_enc={counters.observacoes}, conclusoes={counters.conclusoes}"
             )
 
-    def _seed_catalogs(self, ws_apoio: Worksheet | None, ws_inf: Worksheet):
+    def _seed_catalogs(
+        self,
+        ws_apoio: Worksheet | None,
+        layout_apoio: SheetLayout | None,
+        ws_inf: Worksheet,
+        layout_inf: SheetLayout,
+        row_pairs: list[tuple[int, str]],
+    ):
         for value in ("NORMAL", "MULHER", "EMENDA"):
             TipoFEM.objects.get_or_create(nome=value)
 
-        for row, _ in _iter_ptm_rows(ws_inf):
-            _get_or_create_nome(Municipio, ws_inf[f"C{row}"].value)
-            _get_or_create_nome(StatusPTM, ws_inf[f"M{row}"].value)
-            _get_or_create_nome(StatusObra, ws_inf[f"N{row}"].value)
-            _get_or_create_nome(Secretaria, ws_inf[f"Q{row}"].value)
-            _get_or_create_nome(AreaInvestimento, ws_inf[f"S{row}"].value)
+        for row, _ in row_pairs:
+            _get_or_create_nome(Municipio, _value(ws_inf, layout_inf, row, "C"))
+            _get_or_create_nome(StatusPTM, _value(ws_inf, layout_inf, row, "M"))
+            _get_or_create_nome(StatusObra, _value(ws_inf, layout_inf, row, "N"))
+            _get_or_create_nome(Secretaria, _value(ws_inf, layout_inf, row, "Q"))
+            _get_or_create_nome(AreaInvestimento, _value(ws_inf, layout_inf, row, "S"))
 
-        if ws_apoio is None:
+        if ws_apoio is None or layout_apoio is None:
             return
 
-        for row in range(3, ws_apoio.max_row + 1):
-            _get_or_create_nome(StatusPTM, ws_apoio[f"B{row}"].value)
-            _get_or_create_nome(StatusObra, ws_apoio[f"C{row}"].value)
-            _get_or_create_nome(Municipio, ws_apoio[f"I{row}"].value)
+        for row in range(layout_apoio.first_data_row, ws_apoio.max_row + 1):
+            _get_or_create_nome(StatusPTM, _value(ws_apoio, layout_apoio, row, "B"))
+            _get_or_create_nome(StatusObra, _value(ws_apoio, layout_apoio, row, "C"))
+            _get_or_create_nome(Municipio, _value(ws_apoio, layout_apoio, row, "I"))
 
-    def _upsert_ptm(self, ws_inf: Worksheet, row: int, ordem: str):
-        tipo_fem = _required_nome(TipoFEM, ws_inf[f"F{row}"].value, "NORMAL")
-        status_ptm = _get_or_create_nome(StatusPTM, ws_inf[f"M{row}"].value)
-        status_obra = _get_or_create_nome(StatusObra, ws_inf[f"N{row}"].value)
-        area = _get_or_create_nome(AreaInvestimento, ws_inf[f"S{row}"].value)
-        secretaria = _get_or_create_nome(Secretaria, ws_inf[f"Q{row}"].value)
+    def _upsert_ptm(self, ws_inf: Worksheet, layout_inf: SheetLayout, row: int, ordem: str):
+        tipo_fem = _required_nome(TipoFEM, _value(ws_inf, layout_inf, row, "F"), "NORMAL")
+        status_ptm = _get_or_create_nome(StatusPTM, _value(ws_inf, layout_inf, row, "M"))
+        status_obra = _get_or_create_nome(StatusObra, _value(ws_inf, layout_inf, row, "N"))
+        area = _get_or_create_nome(AreaInvestimento, _value(ws_inf, layout_inf, row, "S"))
+        secretaria = _get_or_create_nome(Secretaria, _value(ws_inf, layout_inf, row, "Q"))
         defaults = {
-            "regiao": _to_str(ws_inf[f"B{row}"].value),
-            "municipio": _to_str(ws_inf[f"C{row}"].value),
-            "projeto": _to_str(ws_inf[f"D{row}"].value),
-            "projeto_detalhado": _to_str(ws_inf[f"E{row}"].value),
+            "regiao": _to_str(_value(ws_inf, layout_inf, row, "B")),
+            "municipio": _to_str(_value(ws_inf, layout_inf, row, "C")),
+            "projeto": _to_str(_value(ws_inf, layout_inf, row, "D")),
+            "projeto_detalhado": _to_str(_value(ws_inf, layout_inf, row, "E")),
             "tipo_fem": tipo_fem,
             "status_ptm_atual": status_ptm,
             "status_obra_atual": status_obra,
-            "data_final": _to_date(ws_inf[f"G{row}"].value),
-            "data_aprovacao": _to_date(ws_inf[f"O{row}"].value),
-            "teto_fem": _to_decimal(ws_inf[f"H{row}"].value),
-            "investimento_total": _to_decimal(ws_inf[f"I{row}"].value),
-            "recurso_fem": _to_decimal(ws_inf[f"J{row}"].value),
-            "rendimentos_fem": _to_decimal(ws_inf[f"K{row}"].value),
-            "contrapartida": _to_decimal(ws_inf[f"L{row}"].value),
-            "ressalva": _to_str(ws_inf[f"P{row}"].value),
+            "data_final": _to_date(_value(ws_inf, layout_inf, row, "G")),
+            "data_aprovacao": _to_date(_value(ws_inf, layout_inf, row, "O")),
+            "teto_fem": _to_decimal(_value(ws_inf, layout_inf, row, "H")),
+            "investimento_total": _to_decimal(_value(ws_inf, layout_inf, row, "I")),
+            "recurso_fem": _to_decimal(_value(ws_inf, layout_inf, row, "J")),
+            "rendimentos_fem": _to_decimal(_value(ws_inf, layout_inf, row, "K")),
+            "contrapartida": _to_decimal(_value(ws_inf, layout_inf, row, "L")),
+            "ressalva": _to_str(_value(ws_inf, layout_inf, row, "P")),
             "secretaria": secretaria,
             "area_investimento": area,
-            "conta_ptm": _to_str_limited(ws_inf[f"T{row}"].value, 50),
-            "descricao": _to_str(ws_inf[f"AI{row}"].value),
-            "populacao_beneficiada": int(ws_inf[f"U{row}"].value)
-            if isinstance(ws_inf[f"U{row}"].value, (int, float))
+            "conta_ptm": _to_str_limited(_value(ws_inf, layout_inf, row, "T"), 50),
+            "descricao": _to_str(_value(ws_inf, layout_inf, row, "AI")),
+            "populacao_beneficiada": int(_value(ws_inf, layout_inf, row, "U"))
+            if isinstance(_value(ws_inf, layout_inf, row, "U"), (int, float))
             else None,
         }
 
         return PTM.objects.update_or_create(ordem=ordem, defaults=defaults)
 
-    def _import_eventos(self, ws: Worksheet, row: int, ptm: PTM) -> int:
+    def _import_eventos(self, ws: Worksheet, layout: SheetLayout, row: int, ptm: PTM) -> int:
         to_create: list[EventoPTM] = []
         latest_status_ptm = None
         latest_status_obra = None
         latest_data = date.min
-        col = 6  # F
+        col = layout.first_col + _column_index("F")
         while col + 3 <= ws.max_column:
             descricao = _to_str(ws.cell(row=row, column=col).value)
             data_evento = _to_date(ws.cell(row=row, column=col + 1).value)
@@ -341,12 +424,12 @@ class Command(BaseCommand):
             ptm.save(update_fields=["status_ptm_atual", "status_obra_atual", "updated_at"])
         return len(to_create)
 
-    def _import_termo_adesao(self, ws: Worksheet, row: int, ptm: PTM) -> int:
-        sei = _to_str(ws[f"E{row}"].value)
-        data = _to_date(ws[f"F{row}"].value)
-        responsavel = _get_or_create_nome(TermoAdesaoResponsavel, ws[f"G{row}"].value)
-        observacao = _get_or_create_nome(TermoAdesaoObservacao, ws[f"H{row}"].value)
-        secretaria = _to_str(ws[f"I{row}"].value)
+    def _import_termo_adesao(self, ws: Worksheet, layout: SheetLayout, row: int, ptm: PTM) -> int:
+        sei = _to_str(_value(ws, layout, row, "E"))
+        data = _to_date(_value(ws, layout, row, "F"))
+        responsavel = _get_or_create_nome(TermoAdesaoResponsavel, _value(ws, layout, row, "G"))
+        observacao = _get_or_create_nome(TermoAdesaoObservacao, _value(ws, layout, row, "H"))
+        secretaria = _to_str(_value(ws, layout, row, "I"))
         if not any([sei, data, responsavel, observacao]):
             return 0
         TermoAdesaoPTM.objects.create(
@@ -359,7 +442,7 @@ class Command(BaseCommand):
         )
         return 1
 
-    def _import_pagamentos(self, ws: Worksheet, row: int, ptm: PTM) -> int:
+    def _import_pagamentos(self, ws: Worksheet, layout: SheetLayout, row: int, ptm: PTM) -> int:
         created = 0
         normal_blocks = [
             ("1", "H", "I", "J", "K", "L", "M", "N", "O"),
@@ -368,21 +451,21 @@ class Command(BaseCommand):
             ("4", "AF", "AG", "AH", "AI", "AJ", "AK", "AL", "AM"),
         ]
         for parcela, c_sol, c_env, c_prev, c_real, c_pg, c_ob, c_emp, c_obs in normal_blocks:
-            valor_real = ws[f"{c_real}{row}"].value
-            if valor_real in (None, "") and ws[f"{c_pg}{row}"].value in (None, ""):
+            valor_real = _value(ws, layout, row, c_real)
+            if valor_real in (None, "") and _value(ws, layout, row, c_pg) in (None, ""):
                 continue
             PagamentoPTM.objects.create(
                 ptm=ptm,
                 parcela=parcela,
                 tipo_registro="normal",
-                dt_solicitacao=_to_date(ws[f"{c_sol}{row}"].value),
-                dt_envio_pg=_to_date(ws[f"{c_env}{row}"].value),
-                dt_pagamento=_to_date(ws[f"{c_pg}{row}"].value),
-                valor_previsto=_to_decimal(ws[f"{c_prev}{row}"].value),
+                dt_solicitacao=_to_date(_value(ws, layout, row, c_sol)),
+                dt_envio_pg=_to_date(_value(ws, layout, row, c_env)),
+                dt_pagamento=_to_date(_value(ws, layout, row, c_pg)),
+                valor_previsto=_to_decimal(_value(ws, layout, row, c_prev)),
                 valor_realizado=_to_decimal(valor_real),
-                numero_ob=_to_str_limited(ws[f"{c_ob}{row}"].value, 50),
-                numero_empenho=_to_str_limited(ws[f"{c_emp}{row}"].value, 50),
-                observacao=_to_str(ws[f"{c_obs}{row}"].value),
+                numero_ob=_to_str_limited(_value(ws, layout, row, c_ob), 50),
+                numero_empenho=_to_str_limited(_value(ws, layout, row, c_emp), 50),
+                observacao=_to_str(_value(ws, layout, row, c_obs)),
             )
             created += 1
 
@@ -391,8 +474,8 @@ class Command(BaseCommand):
             ("AT", "AU", "AV", "AW", "AX", "AY"),
         ]
         for c_parcela, c_real, c_pg, c_ob, c_emp, c_obs in extra_blocks:
-            parcela_raw = _to_str(ws[f"{c_parcela}{row}"].value)
-            if not parcela_raw and ws[f"{c_real}{row}"].value in (None, ""):
+            parcela_raw = _to_str(_value(ws, layout, row, c_parcela))
+            if not parcela_raw and _value(ws, layout, row, c_real) in (None, ""):
                 continue
             parcela_num = parcela_raw.replace("ª", "").replace("a", "").strip() or "1"
             if parcela_num not in {"1", "2", "3", "4"}:
@@ -401,18 +484,18 @@ class Command(BaseCommand):
                 ptm=ptm,
                 parcela=parcela_num,
                 tipo_registro="extra",
-                dt_pagamento=_to_date(ws[f"{c_pg}{row}"].value),
-                valor_realizado=_to_decimal(ws[f"{c_real}{row}"].value),
-                numero_ob=_to_str_limited(ws[f"{c_ob}{row}"].value, 50),
-                numero_empenho=_to_str_limited(ws[f"{c_emp}{row}"].value, 50),
-                observacao=_to_str(ws[f"{c_obs}{row}"].value),
+                dt_pagamento=_to_date(_value(ws, layout, row, c_pg)),
+                valor_realizado=_to_decimal(_value(ws, layout, row, c_real)),
+                numero_ob=_to_str_limited(_value(ws, layout, row, c_ob), 50),
+                numero_empenho=_to_str_limited(_value(ws, layout, row, c_emp), 50),
+                observacao=_to_str(_value(ws, layout, row, c_obs)),
             )
             created += 1
         return created
 
-    def _import_vistorias(self, ws: Worksheet, row: int, ptm: PTM) -> int:
+    def _import_vistorias(self, ws: Worksheet, layout: SheetLayout, row: int, ptm: PTM) -> int:
         created = 0
-        col = 6  # F
+        col = layout.first_col + _column_index("F")
         idx = 1
         while col + 3 <= ws.max_column:
             c_sol = get_column_letter(col)
@@ -436,12 +519,12 @@ class Command(BaseCommand):
             idx += 1
         return created
 
-    def _import_prestacao(self, ws: Worksheet, row: int, ptm: PTM) -> tuple[int, int]:
+    def _import_prestacao(self, ws: Worksheet, layout: SheetLayout, row: int, ptm: PTM) -> tuple[int, int]:
         base_has_data = any(
-            ws[f"{col}{row}"].value not in (None, "") for col in ("F", "G", "H")
+            _value(ws, layout, row, col) not in (None, "") for col in ("F", "G", "H")
         )
         hist_pairs: list[tuple[str, str]] = []
-        col = 9  # I
+        col = layout.first_col + _column_index("I")
         while col + 1 <= ws.max_column:
             hist_pairs.append((get_column_letter(col), get_column_letter(col + 1)))
             col += 2
@@ -454,9 +537,9 @@ class Command(BaseCommand):
 
         prestacao = PrestacaoContaPTM.objects.create(
             ptm=ptm,
-            prazo_contas=_to_date(ws[f"F{row}"].value),
-            data_prestacao=_to_date(ws[f"G{row}"].value),
-            situacao=_to_str(ws[f"H{row}"].value),
+            prazo_contas=_to_date(_value(ws, layout, row, "F")),
+            data_prestacao=_to_date(_value(ws, layout, row, "G")),
+            situacao=_to_str(_value(ws, layout, row, "H")),
         )
         for obs_col, data_col in hist_pairs:
             obs = _to_str(ws[f"{obs_col}{row}"].value)
@@ -470,9 +553,9 @@ class Command(BaseCommand):
                 hist_count += 1
         return 1, hist_count
 
-    def _import_observacoes(self, ws: Worksheet, row: int, ptm: PTM) -> int:
+    def _import_observacoes(self, ws: Worksheet, layout: SheetLayout, row: int, ptm: PTM) -> int:
         created = 0
-        col = 6  # F
+        col = layout.first_col + _column_index("F")
         while col + 1 <= ws.max_column:
             obs = _to_str(ws.cell(row=row, column=col).value)
             data_registro = _to_date(ws.cell(row=row, column=col + 1).value)
@@ -486,7 +569,7 @@ class Command(BaseCommand):
             col += 2
         return created
 
-    def _import_conclusoes(self, ws: Worksheet, row: int, ptm: PTM) -> int:
+    def _import_conclusoes(self, ws: Worksheet, layout: SheetLayout, row: int, ptm: PTM) -> int:
         created = 0
         blocks = [
             ("F", "G", "H", "I"),
@@ -494,10 +577,10 @@ class Command(BaseCommand):
             ("N", "O", "P", "Q"),
         ]
         for c_pct, c_data, c_contato, c_obs in blocks:
-            pct = ws[f"{c_pct}{row}"].value
-            data_registro = _to_date(ws[f"{c_data}{row}"].value)
-            contato = _to_str(ws[f"{c_contato}{row}"].value)
-            obs = _to_str(ws[f"{c_obs}{row}"].value)
+            pct = _value(ws, layout, row, c_pct)
+            data_registro = _to_date(_value(ws, layout, row, c_data))
+            contato = _to_str(_value(ws, layout, row, c_contato))
+            obs = _to_str(_value(ws, layout, row, c_obs))
             if pct in (None, "") and not data_registro and not contato and not obs:
                 continue
             ConclusaoInformalPTM.objects.create(
