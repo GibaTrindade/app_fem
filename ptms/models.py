@@ -36,6 +36,8 @@ class PTM(TimestampedModel):
     municipio = models.CharField(max_length=120)
     projeto = models.TextField()
     projeto_detalhado = models.TextField(blank=True)
+    deputado = models.CharField(max_length=200, blank=True)
+    numero_emenda = models.CharField(max_length=255, blank=True)
 
     tipo_fem = models.ForeignKey(TipoFEM, on_delete=models.PROTECT)
     status_ptm_atual = models.ForeignKey(

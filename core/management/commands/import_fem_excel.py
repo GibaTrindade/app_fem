@@ -168,6 +168,29 @@ def _iter_ptm_rows(ws: Worksheet, layout: SheetLayout, fallback_ordens: list[tup
             yield row, ordem
 
 
+def _header_value(ws: Worksheet, layout: SheetLayout, letter: str) -> str:
+    if not layout.has_ordem:
+        if letter.upper() == "A":
+            return ""
+        offset = _column_index(letter) - 1
+        value = ws.cell(row=layout.header_row, column=layout.first_col + offset).value
+        return _to_str(value)
+    value = ws[f"{_logical_column(layout, letter)}{layout.header_row}"].value
+    return _to_str(value)
+
+
+def _is_emenda_inf_layout(ws: Worksheet, layout: SheetLayout) -> bool:
+    return _norm(_header_value(ws, layout, "F")) == "deputado"
+
+
+def _is_emenda_termo_layout(ws: Worksheet, layout: SheetLayout) -> bool:
+    return _norm(_header_value(ws, layout, "E")) == "cod"
+
+
+def _prestacao_has_situacao(ws: Worksheet, layout: SheetLayout) -> bool:
+    return _norm(_header_value(ws, layout, "H")) == "situacao da pc"
+
+
 def _get_or_create_nome(model, value: str):
     value = _to_str(value)
     if not value:
@@ -339,12 +362,25 @@ class Command(BaseCommand):
         for value in ("NORMAL", "MULHER", "EMENDA"):
             TipoFEM.objects.get_or_create(nome=value)
 
+        is_emenda_inf = _is_emenda_inf_layout(ws_inf, layout_inf)
         for row, _ in row_pairs:
             _get_or_create_nome(Municipio, _value(ws_inf, layout_inf, row, "C"))
-            _get_or_create_nome(StatusPTM, _value(ws_inf, layout_inf, row, "M"))
-            _get_or_create_nome(StatusObra, _value(ws_inf, layout_inf, row, "N"))
-            _get_or_create_nome(Secretaria, _value(ws_inf, layout_inf, row, "Q"))
-            _get_or_create_nome(AreaInvestimento, _value(ws_inf, layout_inf, row, "S"))
+            _get_or_create_nome(
+                StatusPTM,
+                _value(ws_inf, layout_inf, row, "N" if is_emenda_inf else "M"),
+            )
+            _get_or_create_nome(
+                StatusObra,
+                _value(ws_inf, layout_inf, row, "O" if is_emenda_inf else "N"),
+            )
+            _get_or_create_nome(
+                Secretaria,
+                _value(ws_inf, layout_inf, row, "S" if is_emenda_inf else "Q"),
+            )
+            _get_or_create_nome(
+                AreaInvestimento,
+                _value(ws_inf, layout_inf, row, "U" if is_emenda_inf else "S"),
+            )
 
         if ws_apoio is None or layout_apoio is None:
             return
@@ -355,35 +391,70 @@ class Command(BaseCommand):
             _get_or_create_nome(Municipio, _value(ws_apoio, layout_apoio, row, "I"))
 
     def _upsert_ptm(self, ws_inf: Worksheet, layout_inf: SheetLayout, row: int, ordem: str):
-        tipo_fem = _required_nome(TipoFEM, _value(ws_inf, layout_inf, row, "F"), "NORMAL")
-        status_ptm = _get_or_create_nome(StatusPTM, _value(ws_inf, layout_inf, row, "M"))
-        status_obra = _get_or_create_nome(StatusObra, _value(ws_inf, layout_inf, row, "N"))
-        area = _get_or_create_nome(AreaInvestimento, _value(ws_inf, layout_inf, row, "S"))
-        secretaria = _get_or_create_nome(Secretaria, _value(ws_inf, layout_inf, row, "Q"))
-        defaults = {
-            "regiao": _to_str(_value(ws_inf, layout_inf, row, "B")),
-            "municipio": _to_str(_value(ws_inf, layout_inf, row, "C")),
-            "projeto": _to_str(_value(ws_inf, layout_inf, row, "D")),
-            "projeto_detalhado": _to_str(_value(ws_inf, layout_inf, row, "E")),
-            "tipo_fem": tipo_fem,
-            "status_ptm_atual": status_ptm,
-            "status_obra_atual": status_obra,
-            "data_final": _to_date(_value(ws_inf, layout_inf, row, "G")),
-            "data_aprovacao": _to_date(_value(ws_inf, layout_inf, row, "O")),
-            "teto_fem": _to_decimal(_value(ws_inf, layout_inf, row, "H")),
-            "investimento_total": _to_decimal(_value(ws_inf, layout_inf, row, "I")),
-            "recurso_fem": _to_decimal(_value(ws_inf, layout_inf, row, "J")),
-            "rendimentos_fem": _to_decimal(_value(ws_inf, layout_inf, row, "K")),
-            "contrapartida": _to_decimal(_value(ws_inf, layout_inf, row, "L")),
-            "ressalva": _to_str(_value(ws_inf, layout_inf, row, "P")),
-            "secretaria": secretaria,
-            "area_investimento": area,
-            "conta_ptm": _to_str_limited(_value(ws_inf, layout_inf, row, "T"), 50),
-            "descricao": _to_str(_value(ws_inf, layout_inf, row, "AI")),
-            "populacao_beneficiada": int(_value(ws_inf, layout_inf, row, "U"))
-            if isinstance(_value(ws_inf, layout_inf, row, "U"), (int, float))
-            else None,
-        }
+        if _is_emenda_inf_layout(ws_inf, layout_inf):
+            tipo_fem = _required_nome(TipoFEM, "EMENDA", "EMENDA")
+            status_ptm = _get_or_create_nome(StatusPTM, _value(ws_inf, layout_inf, row, "N"))
+            status_obra = _get_or_create_nome(StatusObra, _value(ws_inf, layout_inf, row, "O"))
+            area = _get_or_create_nome(AreaInvestimento, _value(ws_inf, layout_inf, row, "U"))
+            secretaria = _get_or_create_nome(Secretaria, _value(ws_inf, layout_inf, row, "S"))
+            defaults = {
+                "regiao": _to_str(_value(ws_inf, layout_inf, row, "B")),
+                "municipio": _to_str(_value(ws_inf, layout_inf, row, "C")),
+                "projeto": _to_str(_value(ws_inf, layout_inf, row, "D")),
+                "projeto_detalhado": _to_str(_value(ws_inf, layout_inf, row, "E")),
+                "deputado": _to_str(_value(ws_inf, layout_inf, row, "F")),
+                "numero_emenda": _to_str(_value(ws_inf, layout_inf, row, "H")),
+                "tipo_fem": tipo_fem,
+                "status_ptm_atual": status_ptm,
+                "status_obra_atual": status_obra,
+                "data_final": _to_date(_value(ws_inf, layout_inf, row, "G")),
+                "data_aprovacao": _to_date(_value(ws_inf, layout_inf, row, "P")),
+                "teto_fem": _to_decimal(_value(ws_inf, layout_inf, row, "K")),
+                "investimento_total": _to_decimal(_value(ws_inf, layout_inf, row, "I")),
+                "recurso_fem": _to_decimal(_value(ws_inf, layout_inf, row, "J")),
+                "rendimentos_fem": _to_decimal(_value(ws_inf, layout_inf, row, "L")),
+                "contrapartida": _to_decimal(_value(ws_inf, layout_inf, row, "M")),
+                "ressalva": _to_str(_value(ws_inf, layout_inf, row, "R")),
+                "secretaria": secretaria,
+                "area_investimento": area,
+                "conta_ptm": _to_str_limited(_value(ws_inf, layout_inf, row, "V"), 50),
+                "descricao": "",
+                "populacao_beneficiada": int(_value(ws_inf, layout_inf, row, "W"))
+                if isinstance(_value(ws_inf, layout_inf, row, "W"), (int, float))
+                else None,
+            }
+        else:
+            tipo_fem = _required_nome(TipoFEM, _value(ws_inf, layout_inf, row, "F"), "NORMAL")
+            status_ptm = _get_or_create_nome(StatusPTM, _value(ws_inf, layout_inf, row, "M"))
+            status_obra = _get_or_create_nome(StatusObra, _value(ws_inf, layout_inf, row, "N"))
+            area = _get_or_create_nome(AreaInvestimento, _value(ws_inf, layout_inf, row, "S"))
+            secretaria = _get_or_create_nome(Secretaria, _value(ws_inf, layout_inf, row, "Q"))
+            defaults = {
+                "regiao": _to_str(_value(ws_inf, layout_inf, row, "B")),
+                "municipio": _to_str(_value(ws_inf, layout_inf, row, "C")),
+                "projeto": _to_str(_value(ws_inf, layout_inf, row, "D")),
+                "projeto_detalhado": _to_str(_value(ws_inf, layout_inf, row, "E")),
+                "deputado": "",
+                "numero_emenda": "",
+                "tipo_fem": tipo_fem,
+                "status_ptm_atual": status_ptm,
+                "status_obra_atual": status_obra,
+                "data_final": _to_date(_value(ws_inf, layout_inf, row, "G")),
+                "data_aprovacao": _to_date(_value(ws_inf, layout_inf, row, "O")),
+                "teto_fem": _to_decimal(_value(ws_inf, layout_inf, row, "H")),
+                "investimento_total": _to_decimal(_value(ws_inf, layout_inf, row, "I")),
+                "recurso_fem": _to_decimal(_value(ws_inf, layout_inf, row, "J")),
+                "rendimentos_fem": _to_decimal(_value(ws_inf, layout_inf, row, "K")),
+                "contrapartida": _to_decimal(_value(ws_inf, layout_inf, row, "L")),
+                "ressalva": _to_str(_value(ws_inf, layout_inf, row, "P")),
+                "secretaria": secretaria,
+                "area_investimento": area,
+                "conta_ptm": _to_str_limited(_value(ws_inf, layout_inf, row, "T"), 50),
+                "descricao": _to_str(_value(ws_inf, layout_inf, row, "AI")),
+                "populacao_beneficiada": int(_value(ws_inf, layout_inf, row, "U"))
+                if isinstance(_value(ws_inf, layout_inf, row, "U"), (int, float))
+                else None,
+            }
 
         return PTM.objects.update_or_create(ordem=ordem, defaults=defaults)
 
@@ -425,11 +496,18 @@ class Command(BaseCommand):
         return len(to_create)
 
     def _import_termo_adesao(self, ws: Worksheet, layout: SheetLayout, row: int, ptm: PTM) -> int:
-        sei = _to_str(_value(ws, layout, row, "E"))
-        data = _to_date(_value(ws, layout, row, "F"))
-        responsavel = _get_or_create_nome(TermoAdesaoResponsavel, _value(ws, layout, row, "G"))
-        observacao = _get_or_create_nome(TermoAdesaoObservacao, _value(ws, layout, row, "H"))
-        secretaria = _to_str(_value(ws, layout, row, "I"))
+        if _is_emenda_termo_layout(ws, layout):
+            sei = _to_str(_value(ws, layout, row, "E"))
+            data = None
+            responsavel = _get_or_create_nome(TermoAdesaoResponsavel, _value(ws, layout, row, "G"))
+            observacao = _get_or_create_nome(TermoAdesaoObservacao, _value(ws, layout, row, "H"))
+            secretaria = _to_str(_value(ws, layout, row, "I"))
+        else:
+            sei = _to_str(_value(ws, layout, row, "E"))
+            data = _to_date(_value(ws, layout, row, "F"))
+            responsavel = _get_or_create_nome(TermoAdesaoResponsavel, _value(ws, layout, row, "G"))
+            observacao = _get_or_create_nome(TermoAdesaoObservacao, _value(ws, layout, row, "H"))
+            secretaria = _to_str(_value(ws, layout, row, "I"))
         if not any([sei, data, responsavel, observacao]):
             return 0
         TermoAdesaoPTM.objects.create(
@@ -520,11 +598,13 @@ class Command(BaseCommand):
         return created
 
     def _import_prestacao(self, ws: Worksheet, layout: SheetLayout, row: int, ptm: PTM) -> tuple[int, int]:
+        has_situacao = _prestacao_has_situacao(ws, layout)
         base_has_data = any(
-            _value(ws, layout, row, col) not in (None, "") for col in ("F", "G", "H")
+            _value(ws, layout, row, col) not in (None, "") for col in ("F", "G")
         )
         hist_pairs: list[tuple[str, str]] = []
-        col = layout.first_col + _column_index("I")
+        hist_start_letter = "I" if has_situacao else "H"
+        col = layout.first_col + _column_index(hist_start_letter)
         while col + 1 <= ws.max_column:
             hist_pairs.append((get_column_letter(col), get_column_letter(col + 1)))
             col += 2
@@ -539,7 +619,7 @@ class Command(BaseCommand):
             ptm=ptm,
             prazo_contas=_to_date(_value(ws, layout, row, "F")),
             data_prestacao=_to_date(_value(ws, layout, row, "G")),
-            situacao=_to_str(_value(ws, layout, row, "H")),
+            situacao=_to_str(_value(ws, layout, row, "H")) if has_situacao else "",
         )
         for obs_col, data_col in hist_pairs:
             obs = _to_str(ws[f"{obs_col}{row}"].value)

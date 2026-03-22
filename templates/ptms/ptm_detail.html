@@ -110,6 +110,10 @@
               </div>
               <div class="p-3">
                 <dl class="row mb-0 small">
+                  <dt class="col-5 text-muted fw-normal">Deputado</dt>
+                  <dd class="col-7 fw-semibold">{{ ptm.deputado|default:"-" }}</dd>
+                  <dt class="col-5 text-muted fw-normal">N. Emenda</dt>
+                  <dd class="col-7 fw-semibold">{{ ptm.numero_emenda|default:"-" }}</dd>
                   <dt class="col-5 text-muted fw-normal">Conta PTM</dt>
                   <dd class="col-7 fw-semibold">{{ ptm.conta_ptm|default:"-" }}</dd>
                   <dt class="col-5 text-muted fw-normal">Populacao</dt>

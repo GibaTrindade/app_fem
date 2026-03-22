@@ -46,6 +46,8 @@ class PTMForm(BaseBootstrapModelForm):
             "municipio",
             "projeto",
             "projeto_detalhado",
+            "deputado",
+            "numero_emenda",
             "tipo_fem",
             "data_final",
             "data_aprovacao",
