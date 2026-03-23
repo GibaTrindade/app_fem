@@ -540,6 +540,13 @@ class PTMListView(ListView):
     context_object_name = "ptms"
     paginate_by = 20
 
+    ANO_FILTER_OPTIONS = [
+        ("2013", "2013"),
+        ("2014", "2014"),
+        ("2015", "2015"),
+        ("EMENDAS", "EMENDAS"),
+    ]
+
     def get_queryset(self):
         queryset = (
             PTM.objects.select_related("tipo_fem", "status_ptm_atual", "status_obra_atual", "secretaria")
@@ -548,6 +555,7 @@ class PTMListView(ListView):
         q = self.request.GET.get("q", "").strip()
         status = self.request.GET.get("status", "").strip()
         municipio = self.request.GET.get("municipio", "").strip()
+        ano = self.request.GET.get("ano", "").strip().upper()
 
         if q:
             q_norm = _normalize_text(q)
@@ -565,6 +573,10 @@ class PTMListView(ListView):
             municipio_norm = _normalize_text(municipio)
             ids = [item.id for item in queryset if municipio_norm in _normalize_text(item.municipio)]
             queryset = queryset.filter(id__in=ids)
+        if ano == "EMENDAS":
+            queryset = queryset.filter(ordem__startswith="E")
+        elif ano in {"2013", "2014", "2015"}:
+            queryset = queryset.filter(ordem__startswith=f"{ano}.")
         return queryset
 
     def get_context_data(self, **kwargs):
@@ -572,6 +584,7 @@ class PTMListView(ListView):
         context["status_options"] = (
             StatusPTM.objects.order_by("nome").values_list("id", "nome").distinct()
         )
+        context["ano_options"] = self.ANO_FILTER_OPTIONS
         context["can_create_ptm"] = self.request.user.is_superuser or bool(
             _allowed_municipios_for_user(self.request.user)
         )
